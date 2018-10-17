@@ -16,6 +16,7 @@ namespace CPU_Simulator
         public const int RAM_SIZE = 256;
         public const int NO_OF_FLAGS = 4;
         public const int BYTE_SIZE = 8;
+        public const int BYTE_LAST = 7;
     }
 
     public static class Registers
@@ -79,9 +80,11 @@ namespace CPU_Simulator
                     break;
 
                 case "1001":
+                    MessageBox.Show(shiftRight(a).ToString());
                     break;
 
                 case "1010":
+                    MessageBox.Show(shiftLeft(a).ToString());
                     break;
 
                 case "1011":
@@ -160,6 +163,67 @@ namespace CPU_Simulator
 
             return r[0];
         }
+
+        private byte shiftRight(byte a)
+        {
+            BitArray original = new BitArray(8), result = new BitArray(8);
+            original = new BitArray(new byte[] { a });
+
+            for (int front = 1, back = 0; front < Globals.BYTE_SIZE; front++, back++)
+            {
+                //enable cout flag TODO
+                result[back] = original[front];
+            }
+
+            byte[] r = new byte[1];
+            result.CopyTo(r, 0);
+
+            return r[0];
+        }
+
+        private byte shiftLeft(byte a)
+        {
+            BitArray original = new BitArray(8), result = new BitArray(8);
+            original = new BitArray(new byte[] { a });
+
+            for (int front = 1, back = 0; front < Globals.BYTE_SIZE; front++, back++)
+            {
+                //enable cout flag TODO
+                result[front] = original[back];
+            }
+
+            byte[] r = new byte[1];
+            result.CopyTo(r, 0);
+
+            return r[0];
+        }
+
+        private byte inverse(byte a)
+        {
+            BitArray result = new BitArray(8);
+            result = new BitArray(new byte[] { a });
+
+            result.Not();
+
+            byte[] r = new byte[1];
+            result.CopyTo(r, 0);
+
+            return r[0];
+        }
+
+        private byte and(byte a)
+        {
+            BitArray binary_a = new BitArray(8), binary_b = new BitArray(8);
+            binary_a = new BitArray(new byte[] { a });
+            binary_b = new BitArray(new byte[] { m_temp.getContents() });
+
+            binary_a.And(binary_b);
+
+            byte[] r = new byte[1];
+            binary_a.CopyTo(r, 0);
+
+            return r[0];
+        }
     }
 
     public class ControlUnit : ALU
@@ -168,8 +232,8 @@ namespace CPU_Simulator
 
         public void fetchInstruction()
         {
-            m_ALU.setTempRegister(200);
-            m_ALU.readOpcode(8, 55);
+            m_ALU.setTempRegister(0);
+            m_ALU.readOpcode(10, 127);
         }
     }
 }
