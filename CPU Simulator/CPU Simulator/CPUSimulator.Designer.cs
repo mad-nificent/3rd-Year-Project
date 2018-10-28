@@ -84,6 +84,7 @@
             this.lblBUS1 = new System.Windows.Forms.Label();
             this.label1 = new System.Windows.Forms.Label();
             this.txtInput = new System.Windows.Forms.RichTextBox();
+            this.btnStart = new System.Windows.Forms.Button();
             this.pnlACC.SuspendLayout();
             this.pnlTMP.SuspendLayout();
             this.pnlGPR1.SuspendLayout();
@@ -685,11 +686,22 @@
             this.txtInput.TabIndex = 16;
             this.txtInput.Text = "";
             // 
+            // btnStart
+            // 
+            this.btnStart.Location = new System.Drawing.Point(798, 473);
+            this.btnStart.Name = "btnStart";
+            this.btnStart.Size = new System.Drawing.Size(75, 23);
+            this.btnStart.TabIndex = 17;
+            this.btnStart.Text = "Start";
+            this.btnStart.UseVisualStyleBackColor = true;
+            this.btnStart.Click += new System.EventHandler(this.btnStart_Click);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1299, 561);
+            this.Controls.Add(this.btnStart);
             this.Controls.Add(this.txtInput);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.pblBUS1);
@@ -799,6 +811,7 @@
         private System.Windows.Forms.Label lblBUS1;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.RichTextBox txtInput;
+        private System.Windows.Forms.Button btnStart;
     }
 }
 
