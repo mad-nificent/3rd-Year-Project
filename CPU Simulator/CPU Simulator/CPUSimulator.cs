@@ -11,6 +11,43 @@ using System.Windows.Forms;
 
 namespace CPU_Simulator
 {
+    public delegate void UpdateRegisterContents();
+
+    public partial class MainForm : Form
+    {
+        private ControlUnit m_CU = new ControlUnit();
+
+        public MainForm()
+        {
+            InitializeComponent();
+        }
+
+        //public void updateAcc(byte data)
+        //{
+        //    txtACC.Text = data.ToString();
+        //}
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+
+            Graphics g;
+            g = e.Graphics;
+
+            Pen myPen = new Pen(Color.Black);
+            myPen.Width = 2;
+
+            //line from top left to MAR
+            g.DrawLine(myPen, 30, 41, 562, 41);
+            //line from RAM to bottom right
+            g.DrawLine(myPen, 900, 66, 900, 440);
+            //line from bottom right to bottom left
+            g.DrawLine(myPen, 900, 440, 30, 440);
+            //line from bottom left to top left
+            g.DrawLine(myPen, 30, 440, 30, 41);
+        }
+    }
+
     public static class Globals
     {
         public const int RAM_SIZE = 256;
@@ -20,23 +57,6 @@ namespace CPU_Simulator
         public const int BYTE_LAST = 7;
         public const int OPCODE_LENGTH = BYTE_LENGTH / 2;
         public const int REGISTER_CODE_LENGTH = 2;
-    }
-
-    public static class Registers
-    {
-
-    }
-
-    public partial class MainForm : Form
-    {
-        private ControlUnit m_CU = new ControlUnit();
-
-        public MainForm()
-        {
-            InitializeComponent();
-
-            m_CU.fetchInstruction();
-        }
     }
 
     public class Register
@@ -54,6 +74,15 @@ namespace CPU_Simulator
     {
         private Register[] m_locations = new Register[Globals.RAM_SIZE];
 
+        public RAM()
+        {
+            for (int count = 0; count < Globals.RAM_SIZE; count++)
+            {
+                m_locations[count] = new Register();
+                m_locations[count].setContents(0);
+            }
+        }
+
         public void writeToLocation(byte address, byte data) { m_locations[address].setContents(data); }
         public byte readFromLocation(byte address) { return m_locations[address].getContents(); }
     }
@@ -70,9 +99,10 @@ namespace CPU_Simulator
     {
         enum flagtype { COUT, EQUAL, A_LARGER, ZERO };
 
-        private bool[] m_flags = new bool[Globals.NO_OF_FLAGS];
-        private Register m_temp = new Register(0);
+        //flags need to be private, find workaround
+        public bool[] m_flags = new bool[Globals.NO_OF_FLAGS];
         private static readonly Register m_bus1 = new Register(1);
+        private Register m_temp = new Register(0);
         private Register m_accumulator = new Register(0);
 
         public ALU()
@@ -92,37 +122,30 @@ namespace CPU_Simulator
             {
                 case "1000":
                     m_accumulator.setContents(add(a));
-                    //MessageBox.Show(add(a).ToString());
                     break;
 
                 case "1001":
                     m_accumulator.setContents(shiftRight(a));
-                    //MessageBox.Show(shiftRight(a).ToString());
                     break;
 
                 case "1010":
                     m_accumulator.setContents(shiftLeft(a));
-                    //MessageBox.Show(shiftLeft(a).ToString());
                     break;
 
                 case "1011":
                     m_accumulator.setContents(inverse(a));
-                    //MessageBox.Show(inverse(a).ToString());
                     break;
 
                 case "1100":
                     m_accumulator.setContents(and(a));
-                    //MessageBox.Show(and(a).ToString());
                     break;
 
                 case "1101":
                     m_accumulator.setContents(or(a));
-                    //MessageBox.Show(or(a).ToString());
                     break;
 
                 case "1110":
                     m_accumulator.setContents(xor(a));
-                    //MessageBox.Show(xor(a).ToString());
                     break;
 
                 case "1111":
@@ -325,15 +348,16 @@ namespace CPU_Simulator
         public enum opcodes { ADD = 8, RIGHT_SHIFT, LEFT_SHIFT, NOT, AND, OR, XOR, COMPARE };
 
         private ALU m_ALU = new ALU();
-        private MAR m_MAR = new MAR();
         private Register m_IAR = new Register(0);
         private Register m_IR = new Register(0);
+        private MAR m_MAR = new MAR();
         private Register[] m_GPR = new Register[Globals.NO_OF_GPR];
+        private byte m_rega, m_regb;
 
         public ControlUnit()
         {
             for (int count = 0; count < Globals.NO_OF_GPR; count++)
-                m_GPR[count].setContents(0);
+                m_GPR[count] = new Register(0);
         }
 
         public void fetchInstruction()
@@ -345,7 +369,7 @@ namespace CPU_Simulator
 
         public void executeInstruction()
         {
-
+            readInstructionRegister();
         }
 
         private void accessMemory() { m_MAR.setContents(m_IAR.getContents()); }
@@ -368,24 +392,142 @@ namespace CPU_Simulator
                 register_a = new BitArray(Globals.REGISTER_CODE_LENGTH), 
                 register_b = new BitArray(Globals.REGISTER_CODE_LENGTH);
 
+            //get instruction from instruction register
             instruction = new BitArray(new byte[] { m_IR.getContents() });
 
-            //get opcode from full instruction
-            byte[] temp = new byte[1];
-            instruction.CopyTo(temp, Globals.OPCODE_LENGTH);
-            opcode = new BitArray(temp);
+            //copy opcode bits
+            for (int count = Globals.OPCODE_LENGTH, opindex = 0; count < Globals.BYTE_LENGTH; count++, opindex++)
+                opcode[opindex] = instruction[count];
 
-            //fetch index 0 and 1 for reg a and 2 and 3 for reg b
-            for (int count = 0, reg_b_index = Globals.REGISTER_CODE_LENGTH; 
-                count < Globals.REGISTER_CODE_LENGTH; count++, reg_b_index++)
+            //deduce the register codes for reg a and b
+            for (int count = 0, reg_a_index = Globals.REGISTER_CODE_LENGTH; 
+                count < Globals.REGISTER_CODE_LENGTH; count++, reg_a_index++)
             {
-                register_a[count] = instruction[count];
-                register_b[count] = instruction[reg_b_index];
+                register_a[count] = instruction[reg_a_index];
+                register_b[count] = instruction[count];
             }
 
+            //copy the register codes back to a decimal value
             byte[] rega = new byte[1], regb = new byte[1];
             register_a.CopyTo(rega, 0);
             register_b.CopyTo(regb, 0);
+
+            //note the selected registers for later
+            m_rega = rega[0];
+            m_regb = regb[0];
+
+            byte[] op = new byte[1];
+            opcode.CopyTo(op, 0);
+
+            if (opcode[3])
+            {
+                //should only set TMP if 2 input operation (needs workaround)
+                //put contents of b in TMP, read and perform instruction, store answer in regb
+                m_ALU.setTempRegister(m_GPR[m_regb].getContents());
+                m_ALU.readOpcode(op[0], m_GPR[m_rega].getContents());
+                m_GPR[m_regb].setContents(m_ALU.getAccumulatorContents());
+            }
+
+            else
+            {
+                switch (op[0])
+                {
+                    case 0:
+                        load();
+                        break;
+
+                    case 1:
+                        store();
+                        break;
+
+                    case 2:
+                        data();
+                        break;
+
+                    case 3:
+                        jumpRegister();
+                        break;
+
+                    case 4:
+                        jump();
+                        break;
+
+                    case 5:
+                        //jumpIf(both registers);
+                        break;
+
+                    case 6:
+                        resetFlags();
+                        break;
+
+                    case 7:
+                        //i/o
+                        break;
+                }
+            }
+        }
+
+        private void load()
+        {
+            m_MAR.setContents(m_GPR[m_rega].getContents());
+            m_GPR[m_regb].setContents(m_MAR.readFromMemory());
+        }
+
+        private void store()
+        {
+            m_MAR.setContents(m_GPR[m_rega].getContents());
+            m_MAR.writeToMemory(m_GPR[m_regb].getContents());
+        }
+
+        private void data()
+        {
+            m_MAR.setContents(m_IAR.getContents());
+            incrementIAR();
+            m_GPR[m_regb].setContents(m_MAR.readFromMemory());
+        }
+
+        private void jumpRegister()
+        {
+            m_MAR.setContents(m_GPR[m_regb].getContents());
+            m_IAR.setContents(m_MAR.readFromMemory());
+        }
+
+        private void jump()
+        {
+            m_MAR.setContents(m_IAR.getContents());
+            m_IAR.setContents(m_MAR.readFromMemory());
+        }
+
+        private void jumpIf(byte condition)
+        {
+            if (condition < 16)
+            {
+                bool conditionfailed = false;
+                BitArray flags = new BitArray(Globals.BYTE_LENGTH);
+                flags = new BitArray(new byte[] { condition });
+
+                //check provided flags are all on
+                for (int count = 0; count < Globals.NO_OF_FLAGS && !conditionfailed; count++)
+                    if (flags[count] && !m_ALU.m_flags[count]) conditionfailed = true;
+
+                //flags on, jump to address
+                if (!conditionfailed)
+                {
+                    m_MAR.setContents(m_IAR.getContents());
+                    m_IAR.setContents(m_MAR.readFromMemory());
+                }
+
+                //move to next instruction
+                else incrementIAR();
+            }
+
+            else MessageBox.Show("Invalid condition");
+        }
+
+        private void resetFlags()
+        {
+            for (int count = 0; count < Globals.NO_OF_FLAGS; count++)
+                m_ALU.m_flags[count] = false;
         }
     }
 }
