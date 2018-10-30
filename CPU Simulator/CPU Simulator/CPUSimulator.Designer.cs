@@ -28,15 +28,6 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.txtACC = new System.Windows.Forms.TextBox();
-            this.pnlACC = new System.Windows.Forms.Panel();
-            this.lblACCEnable = new System.Windows.Forms.Label();
-            this.lblACC = new System.Windows.Forms.Label();
-            this.lblACCSet = new System.Windows.Forms.Label();
-            this.pnlTMP = new System.Windows.Forms.Panel();
-            this.lblTMP = new System.Windows.Forms.Label();
-            this.txtTMP = new System.Windows.Forms.TextBox();
-            this.lblTMPSet = new System.Windows.Forms.Label();
             this.pnlGPR1 = new System.Windows.Forms.Panel();
             this.lblGPR1Enable = new System.Windows.Forms.Label();
             this.lblGPR1 = new System.Windows.Forms.Label();
@@ -57,22 +48,7 @@
             this.lblGPR4Enable = new System.Windows.Forms.Label();
             this.lblGPR4 = new System.Windows.Forms.Label();
             this.txtGPR4 = new System.Windows.Forms.TextBox();
-            this.pnlIAR = new System.Windows.Forms.Panel();
-            this.lblIARSet = new System.Windows.Forms.Label();
-            this.lblIAREnable = new System.Windows.Forms.Label();
-            this.lblIAR = new System.Windows.Forms.Label();
-            this.txtIAR = new System.Windows.Forms.TextBox();
-            this.pnlIR = new System.Windows.Forms.Panel();
-            this.lblIRSet = new System.Windows.Forms.Label();
-            this.label3 = new System.Windows.Forms.Label();
-            this.txtIR = new System.Windows.Forms.TextBox();
-            this.pnlMAR = new System.Windows.Forms.Panel();
-            this.lblMAR = new System.Windows.Forms.Label();
-            this.txtMAR = new System.Windows.Forms.TextBox();
-            this.lblMARSet = new System.Windows.Forms.Label();
             this.pnlRAM = new System.Windows.Forms.Panel();
-            this.lblRAMSet = new System.Windows.Forms.Label();
-            this.lblRAMEnable = new System.Windows.Forms.Label();
             this.lblRAM = new System.Windows.Forms.Label();
             this.pnlCU = new System.Windows.Forms.Panel();
             this.lblCU = new System.Windows.Forms.Label();
@@ -80,120 +56,17 @@
             this.lblFlags = new System.Windows.Forms.Label();
             this.pnlALU = new System.Windows.Forms.Panel();
             this.lblALU = new System.Windows.Forms.Label();
-            this.pnlBUS1 = new System.Windows.Forms.Panel();
-            this.lblBUS1 = new System.Windows.Forms.Label();
             this.txtInput = new System.Windows.Forms.RichTextBox();
             this.btnStart = new System.Windows.Forms.Button();
-            this.pnlACC.SuspendLayout();
-            this.pnlTMP.SuspendLayout();
             this.pnlGPR1.SuspendLayout();
             this.pnlGPR2.SuspendLayout();
             this.pnlGPR3.SuspendLayout();
             this.pnlGPR4.SuspendLayout();
-            this.pnlIAR.SuspendLayout();
-            this.pnlIR.SuspendLayout();
-            this.pnlMAR.SuspendLayout();
             this.pnlRAM.SuspendLayout();
             this.pnlCU.SuspendLayout();
             this.pnlFlags.SuspendLayout();
             this.pnlALU.SuspendLayout();
-            this.pnlBUS1.SuspendLayout();
             this.SuspendLayout();
-            // 
-            // txtACC
-            // 
-            this.txtACC.Location = new System.Drawing.Point(2, 26);
-            this.txtACC.Name = "txtACC";
-            this.txtACC.ReadOnly = true;
-            this.txtACC.Size = new System.Drawing.Size(60, 20);
-            this.txtACC.TabIndex = 0;
-            this.txtACC.Text = "0000 0000";
-            this.txtACC.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
-            // 
-            // pnlACC
-            // 
-            this.pnlACC.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.pnlACC.Controls.Add(this.lblACCEnable);
-            this.pnlACC.Controls.Add(this.lblACC);
-            this.pnlACC.Controls.Add(this.txtACC);
-            this.pnlACC.Controls.Add(this.lblACCSet);
-            this.pnlACC.Location = new System.Drawing.Point(50, 395);
-            this.pnlACC.Name = "pnlACC";
-            this.pnlACC.Size = new System.Drawing.Size(80, 50);
-            this.pnlACC.TabIndex = 1;
-            // 
-            // lblACCEnable
-            // 
-            this.lblACCEnable.AutoSize = true;
-            this.lblACCEnable.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblACCEnable.Location = new System.Drawing.Point(60, 1);
-            this.lblACCEnable.Name = "lblACCEnable";
-            this.lblACCEnable.Size = new System.Drawing.Size(18, 20);
-            this.lblACCEnable.TabIndex = 2;
-            this.lblACCEnable.Text = "e";
-            // 
-            // lblACC
-            // 
-            this.lblACC.AutoSize = true;
-            this.lblACC.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblACC.Location = new System.Drawing.Point(20, 4);
-            this.lblACC.Name = "lblACC";
-            this.lblACC.Size = new System.Drawing.Size(39, 18);
-            this.lblACC.TabIndex = 2;
-            this.lblACC.Text = "ACC";
-            this.lblACC.TextAlign = System.Drawing.ContentAlignment.TopCenter;
-            // 
-            // lblACCSet
-            // 
-            this.lblACCSet.AutoSize = true;
-            this.lblACCSet.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblACCSet.Location = new System.Drawing.Point(60, 25);
-            this.lblACCSet.Name = "lblACCSet";
-            this.lblACCSet.Size = new System.Drawing.Size(17, 20);
-            this.lblACCSet.TabIndex = 3;
-            this.lblACCSet.Text = "s";
-            // 
-            // pnlTMP
-            // 
-            this.pnlTMP.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.pnlTMP.Controls.Add(this.lblTMP);
-            this.pnlTMP.Controls.Add(this.txtTMP);
-            this.pnlTMP.Controls.Add(this.lblTMPSet);
-            this.pnlTMP.Location = new System.Drawing.Point(80, 60);
-            this.pnlTMP.Name = "pnlTMP";
-            this.pnlTMP.Size = new System.Drawing.Size(80, 50);
-            this.pnlTMP.TabIndex = 6;
-            // 
-            // lblTMP
-            // 
-            this.lblTMP.AutoSize = true;
-            this.lblTMP.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblTMP.Location = new System.Drawing.Point(20, 4);
-            this.lblTMP.Name = "lblTMP";
-            this.lblTMP.Size = new System.Drawing.Size(40, 18);
-            this.lblTMP.TabIndex = 2;
-            this.lblTMP.Text = "TMP";
-            this.lblTMP.TextAlign = System.Drawing.ContentAlignment.TopCenter;
-            // 
-            // txtTMP
-            // 
-            this.txtTMP.Location = new System.Drawing.Point(2, 26);
-            this.txtTMP.Name = "txtTMP";
-            this.txtTMP.ReadOnly = true;
-            this.txtTMP.Size = new System.Drawing.Size(60, 20);
-            this.txtTMP.TabIndex = 0;
-            this.txtTMP.Text = "0000 0000";
-            this.txtTMP.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
-            // 
-            // lblTMPSet
-            // 
-            this.lblTMPSet.AutoSize = true;
-            this.lblTMPSet.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblTMPSet.Location = new System.Drawing.Point(60, 25);
-            this.lblTMPSet.Name = "lblTMPSet";
-            this.lblTMPSet.Size = new System.Drawing.Size(17, 20);
-            this.lblTMPSet.TabIndex = 3;
-            this.lblTMPSet.Text = "s";
             // 
             // pnlGPR1
             // 
@@ -206,7 +79,6 @@
             this.pnlGPR1.Name = "pnlGPR1";
             this.pnlGPR1.Size = new System.Drawing.Size(80, 50);
             this.pnlGPR1.TabIndex = 4;
-            this.pnlGPR1.Paint += new System.Windows.Forms.PaintEventHandler(this.pnlGPR1_Paint);
             // 
             // lblGPR1Enable
             // 
@@ -261,7 +133,6 @@
             this.pnlGPR2.Name = "pnlGPR2";
             this.pnlGPR2.Size = new System.Drawing.Size(80, 50);
             this.pnlGPR2.TabIndex = 5;
-            this.pnlGPR2.Paint += new System.Windows.Forms.PaintEventHandler(this.pnlGPR2_Paint);
             // 
             // lblGPR2Enable
             // 
@@ -315,7 +186,6 @@
             this.pnlGPR3.Name = "pnlGPR3";
             this.pnlGPR3.Size = new System.Drawing.Size(80, 50);
             this.pnlGPR3.TabIndex = 6;
-            this.pnlGPR3.Paint += new System.Windows.Forms.PaintEventHandler(this.pnlGPR3_Paint);
             // 
             // lblGPR3Set
             // 
@@ -369,7 +239,6 @@
             this.pnlGPR4.Name = "pnlGPR4";
             this.pnlGPR4.Size = new System.Drawing.Size(80, 50);
             this.pnlGPR4.TabIndex = 7;
-            this.pnlGPR4.Paint += new System.Windows.Forms.PaintEventHandler(this.pnlGPR4_Paint);
             // 
             // lblGPR4Set
             // 
@@ -412,173 +281,14 @@
             this.txtGPR4.Text = "0000 0000";
             this.txtGPR4.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             // 
-            // pnlIAR
-            // 
-            this.pnlIAR.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.pnlIAR.Controls.Add(this.lblIARSet);
-            this.pnlIAR.Controls.Add(this.lblIAREnable);
-            this.pnlIAR.Controls.Add(this.lblIAR);
-            this.pnlIAR.Controls.Add(this.txtIAR);
-            this.pnlIAR.Location = new System.Drawing.Point(350, 395);
-            this.pnlIAR.Name = "pnlIAR";
-            this.pnlIAR.Size = new System.Drawing.Size(80, 50);
-            this.pnlIAR.TabIndex = 8;
-            // 
-            // lblIARSet
-            // 
-            this.lblIARSet.AutoSize = true;
-            this.lblIARSet.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblIARSet.Location = new System.Drawing.Point(20, 2);
-            this.lblIARSet.Name = "lblIARSet";
-            this.lblIARSet.Size = new System.Drawing.Size(17, 20);
-            this.lblIARSet.TabIndex = 3;
-            this.lblIARSet.Text = "s";
-            // 
-            // lblIAREnable
-            // 
-            this.lblIAREnable.AutoSize = true;
-            this.lblIAREnable.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblIAREnable.Location = new System.Drawing.Point(0, 2);
-            this.lblIAREnable.Name = "lblIAREnable";
-            this.lblIAREnable.Size = new System.Drawing.Size(18, 20);
-            this.lblIAREnable.TabIndex = 2;
-            this.lblIAREnable.Text = "e";
-            // 
-            // lblIAR
-            // 
-            this.lblIAR.AutoSize = true;
-            this.lblIAR.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblIAR.Location = new System.Drawing.Point(40, 4);
-            this.lblIAR.Name = "lblIAR";
-            this.lblIAR.Size = new System.Drawing.Size(31, 18);
-            this.lblIAR.TabIndex = 2;
-            this.lblIAR.Text = "IAR";
-            this.lblIAR.TextAlign = System.Drawing.ContentAlignment.TopCenter;
-            // 
-            // txtIAR
-            // 
-            this.txtIAR.Location = new System.Drawing.Point(10, 26);
-            this.txtIAR.Name = "txtIAR";
-            this.txtIAR.ReadOnly = true;
-            this.txtIAR.Size = new System.Drawing.Size(60, 20);
-            this.txtIAR.TabIndex = 0;
-            this.txtIAR.Text = "0000 0000";
-            this.txtIAR.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
-            // 
-            // pnlIR
-            // 
-            this.pnlIR.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.pnlIR.Controls.Add(this.lblIRSet);
-            this.pnlIR.Controls.Add(this.label3);
-            this.pnlIR.Controls.Add(this.txtIR);
-            this.pnlIR.Location = new System.Drawing.Point(470, 395);
-            this.pnlIR.Name = "pnlIR";
-            this.pnlIR.Size = new System.Drawing.Size(80, 50);
-            this.pnlIR.TabIndex = 9;
-            // 
-            // lblIRSet
-            // 
-            this.lblIRSet.AutoSize = true;
-            this.lblIRSet.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblIRSet.Location = new System.Drawing.Point(20, 2);
-            this.lblIRSet.Name = "lblIRSet";
-            this.lblIRSet.Size = new System.Drawing.Size(17, 20);
-            this.lblIRSet.TabIndex = 3;
-            this.lblIRSet.Text = "s";
-            // 
-            // label3
-            // 
-            this.label3.AutoSize = true;
-            this.label3.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label3.Location = new System.Drawing.Point(40, 4);
-            this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(22, 18);
-            this.label3.TabIndex = 2;
-            this.label3.Text = "IR";
-            this.label3.TextAlign = System.Drawing.ContentAlignment.TopCenter;
-            // 
-            // txtIR
-            // 
-            this.txtIR.Location = new System.Drawing.Point(10, 26);
-            this.txtIR.Name = "txtIR";
-            this.txtIR.ReadOnly = true;
-            this.txtIR.Size = new System.Drawing.Size(60, 20);
-            this.txtIR.TabIndex = 0;
-            this.txtIR.Text = "0000 0000";
-            this.txtIR.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
-            // 
-            // pnlMAR
-            // 
-            this.pnlMAR.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.pnlMAR.Controls.Add(this.lblMAR);
-            this.pnlMAR.Controls.Add(this.txtMAR);
-            this.pnlMAR.Controls.Add(this.lblMARSet);
-            this.pnlMAR.Location = new System.Drawing.Point(415, 10);
-            this.pnlMAR.Name = "pnlMAR";
-            this.pnlMAR.Size = new System.Drawing.Size(80, 50);
-            this.pnlMAR.TabIndex = 10;
-            // 
-            // lblMAR
-            // 
-            this.lblMAR.AutoSize = true;
-            this.lblMAR.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblMAR.Location = new System.Drawing.Point(20, 4);
-            this.lblMAR.Name = "lblMAR";
-            this.lblMAR.Size = new System.Drawing.Size(41, 18);
-            this.lblMAR.TabIndex = 2;
-            this.lblMAR.Text = "MAR";
-            this.lblMAR.TextAlign = System.Drawing.ContentAlignment.TopCenter;
-            // 
-            // txtMAR
-            // 
-            this.txtMAR.Location = new System.Drawing.Point(2, 26);
-            this.txtMAR.Name = "txtMAR";
-            this.txtMAR.ReadOnly = true;
-            this.txtMAR.Size = new System.Drawing.Size(60, 20);
-            this.txtMAR.TabIndex = 0;
-            this.txtMAR.Text = "0000 0000";
-            this.txtMAR.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
-            // 
-            // lblMARSet
-            // 
-            this.lblMARSet.AutoSize = true;
-            this.lblMARSet.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblMARSet.Location = new System.Drawing.Point(60, 25);
-            this.lblMARSet.Name = "lblMARSet";
-            this.lblMARSet.Size = new System.Drawing.Size(17, 20);
-            this.lblMARSet.TabIndex = 3;
-            this.lblMARSet.Text = "s";
-            // 
             // pnlRAM
             // 
             this.pnlRAM.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.pnlRAM.Controls.Add(this.lblRAMSet);
-            this.pnlRAM.Controls.Add(this.lblRAMEnable);
             this.pnlRAM.Controls.Add(this.lblRAM);
             this.pnlRAM.Location = new System.Drawing.Point(495, 10);
             this.pnlRAM.Name = "pnlRAM";
             this.pnlRAM.Size = new System.Drawing.Size(270, 50);
             this.pnlRAM.TabIndex = 11;
-            // 
-            // lblRAMSet
-            // 
-            this.lblRAMSet.AutoSize = true;
-            this.lblRAMSet.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblRAMSet.Location = new System.Drawing.Point(22, 25);
-            this.lblRAMSet.Name = "lblRAMSet";
-            this.lblRAMSet.Size = new System.Drawing.Size(17, 20);
-            this.lblRAMSet.TabIndex = 5;
-            this.lblRAMSet.Text = "s";
-            // 
-            // lblRAMEnable
-            // 
-            this.lblRAMEnable.AutoSize = true;
-            this.lblRAMEnable.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblRAMEnable.Location = new System.Drawing.Point(4, 25);
-            this.lblRAMEnable.Name = "lblRAMEnable";
-            this.lblRAMEnable.Size = new System.Drawing.Size(18, 20);
-            this.lblRAMEnable.TabIndex = 4;
-            this.lblRAMEnable.Text = "e";
             // 
             // lblRAM
             // 
@@ -655,28 +365,6 @@
             this.lblALU.Text = "ALU";
             this.lblALU.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
-            // pnlBUS1
-            // 
-            this.pnlBUS1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.pnlBUS1.Controls.Add(this.lblBUS1);
-            this.pnlBUS1.Location = new System.Drawing.Point(90, 130);
-            this.pnlBUS1.Name = "pnlBUS1";
-            this.pnlBUS1.Size = new System.Drawing.Size(55, 25);
-            this.pnlBUS1.TabIndex = 14;
-            // 
-            // lblBUS1
-            // 
-            this.lblBUS1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)));
-            this.lblBUS1.AutoSize = true;
-            this.lblBUS1.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblBUS1.Location = new System.Drawing.Point(3, 2);
-            this.lblBUS1.MinimumSize = new System.Drawing.Size(50, 20);
-            this.lblBUS1.Name = "lblBUS1";
-            this.lblBUS1.Size = new System.Drawing.Size(50, 20);
-            this.lblBUS1.TabIndex = 4;
-            this.lblBUS1.Text = "BUS1";
-            this.lblBUS1.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
             // txtInput
             // 
             this.txtInput.BackColor = System.Drawing.SystemColors.HighlightText;
@@ -704,27 +392,16 @@
             this.ClientSize = new System.Drawing.Size(1137, 489);
             this.Controls.Add(this.btnStart);
             this.Controls.Add(this.txtInput);
-            this.Controls.Add(this.pnlBUS1);
             this.Controls.Add(this.pnlALU);
             this.Controls.Add(this.pnlFlags);
             this.Controls.Add(this.pnlCU);
             this.Controls.Add(this.pnlRAM);
-            this.Controls.Add(this.pnlMAR);
-            this.Controls.Add(this.pnlIR);
-            this.Controls.Add(this.pnlIAR);
             this.Controls.Add(this.pnlGPR4);
             this.Controls.Add(this.pnlGPR3);
             this.Controls.Add(this.pnlGPR2);
             this.Controls.Add(this.pnlGPR1);
-            this.Controls.Add(this.pnlTMP);
-            this.Controls.Add(this.pnlACC);
             this.Name = "MainForm";
             this.Text = "CPU Simulator";
-            this.Load += new System.EventHandler(this.MainForm_Load);
-            this.pnlACC.ResumeLayout(false);
-            this.pnlACC.PerformLayout();
-            this.pnlTMP.ResumeLayout(false);
-            this.pnlTMP.PerformLayout();
             this.pnlGPR1.ResumeLayout(false);
             this.pnlGPR1.PerformLayout();
             this.pnlGPR2.ResumeLayout(false);
@@ -733,12 +410,6 @@
             this.pnlGPR3.PerformLayout();
             this.pnlGPR4.ResumeLayout(false);
             this.pnlGPR4.PerformLayout();
-            this.pnlIAR.ResumeLayout(false);
-            this.pnlIAR.PerformLayout();
-            this.pnlIR.ResumeLayout(false);
-            this.pnlIR.PerformLayout();
-            this.pnlMAR.ResumeLayout(false);
-            this.pnlMAR.PerformLayout();
             this.pnlRAM.ResumeLayout(false);
             this.pnlRAM.PerformLayout();
             this.pnlCU.ResumeLayout(false);
@@ -747,23 +418,11 @@
             this.pnlFlags.PerformLayout();
             this.pnlALU.ResumeLayout(false);
             this.pnlALU.PerformLayout();
-            this.pnlBUS1.ResumeLayout(false);
-            this.pnlBUS1.PerformLayout();
             this.ResumeLayout(false);
 
         }
 
         #endregion
-
-        private System.Windows.Forms.TextBox txtACC;
-        private System.Windows.Forms.Panel pnlACC;
-        private System.Windows.Forms.Label lblACCSet;
-        private System.Windows.Forms.Label lblACCEnable;
-        private System.Windows.Forms.Label lblACC;
-        private System.Windows.Forms.Panel pnlTMP;
-        private System.Windows.Forms.Label lblTMPSet;
-        private System.Windows.Forms.Label lblTMP;
-        private System.Windows.Forms.TextBox txtTMP;
         private System.Windows.Forms.Panel pnlGPR1;
         private System.Windows.Forms.Label lblGPR1Set;
         private System.Windows.Forms.Label lblGPR1Enable;
@@ -784,22 +443,7 @@
         private System.Windows.Forms.Label lblGPR4Enable;
         private System.Windows.Forms.Label lblGPR4;
         private System.Windows.Forms.TextBox txtGPR4;
-        private System.Windows.Forms.Panel pnlIAR;
-        private System.Windows.Forms.Label lblIARSet;
-        private System.Windows.Forms.Label lblIAREnable;
-        private System.Windows.Forms.Label lblIAR;
-        private System.Windows.Forms.TextBox txtIAR;
-        private System.Windows.Forms.Panel pnlIR;
-        private System.Windows.Forms.Label lblIRSet;
-        private System.Windows.Forms.Label label3;
-        private System.Windows.Forms.TextBox txtIR;
-        private System.Windows.Forms.Panel pnlMAR;
-        private System.Windows.Forms.Label lblMARSet;
-        private System.Windows.Forms.Label lblMAR;
-        private System.Windows.Forms.TextBox txtMAR;
         private System.Windows.Forms.Panel pnlRAM;
-        private System.Windows.Forms.Label lblRAMSet;
-        private System.Windows.Forms.Label lblRAMEnable;
         private System.Windows.Forms.Label lblRAM;
         private System.Windows.Forms.Panel pnlCU;
         private System.Windows.Forms.Label lblCU;
@@ -807,8 +451,6 @@
         private System.Windows.Forms.Label lblFlags;
         private System.Windows.Forms.Panel pnlALU;
         private System.Windows.Forms.Label lblALU;
-        private System.Windows.Forms.Panel pnlBUS1;
-        private System.Windows.Forms.Label lblBUS1;
         private System.Windows.Forms.RichTextBox txtInput;
         private System.Windows.Forms.Button btnStart;
     }

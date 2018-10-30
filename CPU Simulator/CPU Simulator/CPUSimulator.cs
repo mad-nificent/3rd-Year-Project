@@ -16,11 +16,41 @@ namespace CPU_Simulator
 
     public partial class MainForm : Form
     {
+        System.Timers.Timer timer = new System.Timers.Timer();
+
         private ControlUnit m_CU;
+
+        private Panel pnlTmp = new Panel();
+        private Label lblTmp = new Label();
+        private Label lblTmpContents = new Label();
+
+        private Panel pnlBus1 = new Panel();
+        private Label lblBus1 = new Label();
+
+        private Panel pnlAcc = new Panel();
+        private Label lblAcc = new Label();
+        private Label lblAccContents = new Label();
+
+        private Panel pnlIar = new Panel();
+        private Label lblIar = new Label();
+        private Label lblIarContents = new Label();
+
+        private Panel pnlIr = new Panel();
+        private Label lblIr = new Label();
+        private Label lblIrContents = new Label();
+
+        private Panel pnlMar = new Panel();
+        private Label lblMar = new Label();
+        private Label lblMarContents = new Label();
 
         public MainForm()
         {
             InitializeComponent();
+            drawCPU();
+
+            timer.Elapsed += new System.Timers.ElapsedEventHandler(resetColours);
+            timer.Interval = 2000;
+            timer.Enabled = true;
 
             BitArray loadintoreg1 = new BitArray(new bool[] { false, false, false, false, false, true, false, false });
             BitArray inputa = new BitArray(new bool[] { true, false, true, false, false, false, false, false });
@@ -38,34 +68,191 @@ namespace CPU_Simulator
             m_CU.m_ALU.UpdateACC += updateAcc;
         }
 
+        private void drawCPU()
+        {
+            //TMP register
+            //--------------------------------------------
+            pnlTmp.BorderStyle = BorderStyle.FixedSingle;
+            pnlTmp.Location = new Point(80, 60);
+            pnlTmp.Size = new Size(80, 50);
+            Controls.Add(pnlTmp);
+
+            lblTmp.Text = "TMP";
+            lblTmp.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, ((byte)(0)));
+            lblTmp.TextAlign = ContentAlignment.MiddleCenter;
+            lblTmp.Location = new Point(20, 4);
+            lblTmp.Size = new Size(40, 20);
+            pnlTmp.Controls.Add(lblTmp);
+
+            lblTmpContents.Text = "00000000";
+            lblTmpContents.TextAlign = ContentAlignment.MiddleCenter;
+            lblTmpContents.BorderStyle = BorderStyle.FixedSingle;
+            lblTmpContents.Location = new Point(10, 26);
+            lblTmpContents.Size = new Size(60, 20);
+            pnlTmp.Controls.Add(lblTmpContents);
+            //--------------------------------------------
+
+            //BUS1 register
+            //--------------------------------------------
+            pnlBus1.BorderStyle = BorderStyle.FixedSingle;
+            pnlBus1.Location = new Point(91, 130);
+            pnlBus1.Size = new Size(60, 25);
+            Controls.Add(pnlBus1);
+
+            lblBus1.Text = "BUS1";
+            lblBus1.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, ((byte)(0)));
+            lblBus1.TextAlign = ContentAlignment.MiddleCenter;
+            lblBus1.Location = new Point(5, 1);
+            lblBus1.Size = new Size(50, 20);
+            pnlBus1.Controls.Add(lblBus1);
+            //--------------------------------------------
+
+            //ACC register
+            //--------------------------------------------
+            pnlAcc.BorderStyle = BorderStyle.FixedSingle;
+            pnlAcc.Location = new Point(50, 395);
+            pnlAcc.Size = new Size(80, 50);
+            Controls.Add(pnlAcc);
+
+            lblAcc.Text = "ACC";
+            lblAcc.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, ((byte)(0)));
+            lblAcc.TextAlign = ContentAlignment.MiddleCenter;
+            lblAcc.Location = new Point(22, 4);
+            lblAcc.Size = new Size(40, 20);
+            pnlAcc.Controls.Add(lblAcc);
+
+            lblAccContents.Text = "00000000";
+            lblAccContents.TextAlign = ContentAlignment.MiddleCenter;
+            lblAccContents.BorderStyle = BorderStyle.FixedSingle;
+            lblAccContents.Location = new Point(10, 26);
+            lblAccContents.Size = new Size(60, 20);
+            pnlAcc.Controls.Add(lblAccContents);
+            //--------------------------------------------
+
+            //IAR register
+            //--------------------------------------------
+            pnlIar.BorderStyle = BorderStyle.FixedSingle;
+            pnlIar.Location = new Point(350, 395);
+            pnlIar.Size = new Size(80, 50);
+            Controls.Add(pnlIar);
+
+            lblIar.Text = "IAR";
+            lblIar.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, ((byte)(0)));
+            lblIar.TextAlign = ContentAlignment.MiddleCenter;
+            lblIar.Location = new Point(22, 4);
+            lblIar.Size = new Size(40, 20);
+            pnlIar.Controls.Add(lblIar);
+
+            lblIarContents.Text = "00000000";
+            lblIarContents.TextAlign = ContentAlignment.MiddleCenter;
+            lblIarContents.BorderStyle = BorderStyle.FixedSingle;
+            lblIarContents.Location = new Point(10, 26);
+            lblIarContents.Size = new Size(60, 20);
+            pnlIar.Controls.Add(lblIarContents);
+            //--------------------------------------------
+
+            //IR register
+            //--------------------------------------------
+            pnlIr.BorderStyle = BorderStyle.FixedSingle;
+            pnlIr.Location = new Point(470, 395);
+            pnlIr.Size = new Size(80, 50);
+            Controls.Add(pnlIr);
+
+            lblIr.Text = "IR";
+            lblIr.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, ((byte)(0)));
+            lblIr.TextAlign = ContentAlignment.MiddleCenter;
+            lblIr.Location = new Point(22, 4);
+            lblIr.Size = new Size(40, 20);
+            pnlIr.Controls.Add(lblIr);
+
+            lblIrContents.Text = "00000000";
+            lblIrContents.TextAlign = ContentAlignment.MiddleCenter;
+            lblIrContents.BorderStyle = BorderStyle.FixedSingle;
+            lblIrContents.Location = new Point(10, 26);
+            lblIrContents.Size = new Size(60, 20);
+            pnlIr.Controls.Add(lblIrContents);
+            //--------------------------------------------
+
+            //MAR register
+            //--------------------------------------------
+            pnlMar.BorderStyle = BorderStyle.FixedSingle;
+            pnlMar.Location = new Point(415, 10);
+            pnlMar.Size = new Size(80, 50);
+            Controls.Add(pnlMar);
+
+            lblMar.Text = "MAR";
+            lblMar.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, ((byte)(0)));
+            lblMar.TextAlign = ContentAlignment.MiddleCenter;
+            lblMar.Location = new Point(20, 4);
+            lblMar.Size = new Size(41, 20);
+            pnlMar.Controls.Add(lblMar);
+
+            lblMarContents.Text = "00000000";
+            lblMarContents.TextAlign = ContentAlignment.MiddleCenter;
+            lblMarContents.BorderStyle = BorderStyle.FixedSingle;
+            lblMarContents.Location = new Point(10, 26);
+            lblMarContents.Size = new Size(60, 20);
+            pnlMar.Controls.Add(lblMarContents);
+            //--------------------------------------------
+        }
+
+        public void resetColours(object source, System.Timers.ElapsedEventArgs e)
+        {
+            lblTmpContents.ForeColor = Color.Black;
+            lblAccContents.ForeColor = Color.Black;
+            lblIarContents.ForeColor = Color.Black;
+            lblIrContents.ForeColor = Color.Black;
+            lblMarContents.ForeColor = Color.Black;
+        }
+
         public void updateIAR(BitArray data)
         {
             if (InvokeRequired) Invoke(new UpdateRegisterContents(updateIAR), new object[] { data });
-            else txtIAR.Text = Globals.convertBitsToString(data);
+            else
+            {
+                lblIarContents.Text = Globals.convertBitsToString(data);
+                lblIarContents.ForeColor = Color.Red;
+            }
         }
 
         public void updateIR(BitArray data)
         {
             if (InvokeRequired) Invoke(new UpdateRegisterContents(updateIR), new object[] { data });
-            else txtIR.Text = Globals.convertBitsToString(data);
+            else
+            {
+                lblIrContents.Text = Globals.convertBitsToString(data);
+                lblIrContents.ForeColor = Color.Red;
+            }
         }
 
         public void updateMAR(BitArray data)
         {
             if (InvokeRequired) Invoke(new UpdateRegisterContents(updateMAR), new object[] { data });
-            else txtMAR.Text = Globals.convertBitsToString(data);
+            else
+            {
+                lblMarContents.Text = Globals.convertBitsToString(data);
+                lblMarContents.ForeColor = Color.Red;
+            }
         }
 
         public void updateTMP(BitArray data)
         {
             if (InvokeRequired) Invoke(new UpdateRegisterContents(updateTMP), new object[] { data });
-            else txtTMP.Text = Globals.convertBitsToString(data);
+            else
+            {
+                lblTmpContents.Text = Globals.convertBitsToString(data);
+                lblTmpContents.ForeColor = Color.Red;
+            }
         }
 
         public void updateAcc(BitArray data)
         {
             if (InvokeRequired) Invoke(new UpdateRegisterContents(updateAcc), new object[] { data });
-            else txtACC.Text = Globals.convertBitsToString(data);
+            else
+            {
+                lblAccContents.Text = Globals.convertBitsToString(data);
+                lblAccContents.ForeColor = Color.Red;
+            }
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -97,6 +284,8 @@ namespace CPU_Simulator
             g.DrawLine(myPen, 755, 465, 755, 60);
             //---------------------------------
 
+            //bus to other components
+            //----------------------------------------
             //line from bus to tmp
             g.DrawLine(myPen, 117.5f, 35, 117.5f, 75);
             g.DrawLine(myPen, 122.5f, 35, 122.5f, 75);
@@ -148,42 +337,13 @@ namespace CPU_Simulator
             //line from bus to GPR4
             g.DrawLine(myPen, 735, 362.5f, 760, 362.5f);
             g.DrawLine(myPen, 735, 367.5f, 760, 367.5f);
+            //----------------------------------------
         }
 
         private void btnStart_Click(object sender, EventArgs e)
         {
             Thread CPUThread = new Thread(new ThreadStart(m_CU.start));
             CPUThread.Start();
-        }
-
-        private void label1_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void MainForm_Load(object sender, EventArgs e)
-        {
-
-        }
-
-        private void pnlGPR2_Paint(object sender, PaintEventArgs e)
-        {
-
-        }
-
-        private void pnlGPR3_Paint(object sender, PaintEventArgs e)
-        {
-
-        }
-
-        private void pnlGPR1_Paint(object sender, PaintEventArgs e)
-        {
-
-        }
-
-        private void pnlGPR4_Paint(object sender, PaintEventArgs e)
-        {
-
         }
     }
 
@@ -342,6 +502,7 @@ namespace CPU_Simulator
             }
 
             UpdateACC?.Invoke(m_accumulator.getContents());
+            Thread.Sleep(2000);
         }
 
         private BitArray add(BitArray input_a)
@@ -522,6 +683,7 @@ namespace CPU_Simulator
         {
             m_MAR.setContents(m_IAR.getContents());
             UpdateMAR?.Invoke(m_MAR.getContents());
+            Thread.Sleep(2000);
         }
 
         private void incrementIAR()
@@ -547,12 +709,14 @@ namespace CPU_Simulator
             //------------------------------------------------
 
             UpdateIAR?.Invoke(m_IAR.getContents());
+            Thread.Sleep(2000);
         }
 
         private void setInstructionRegister()
         {
             m_IR.setContents(m_MAR.readFromMemory());
             UpdateIR?.Invoke(m_IR.getContents());
+            Thread.Sleep(2000);
         }
 
         private void readInstructionRegister()
@@ -590,6 +754,7 @@ namespace CPU_Simulator
                 //put contents of b in TMP, read and perform instruction, store answer in regb
                 m_ALU.m_temp.setContents(m_GPR[m_regb].getContents());
                 UpdateTMP?.Invoke(m_ALU.m_temp.getContents());
+                Thread.Sleep(2000);
 
                 m_ALU.readOpcode(opcode, m_GPR[m_rega].getContents());
                 m_GPR[m_regb].setContents(m_ALU.m_accumulator.getContents());
@@ -647,6 +812,7 @@ namespace CPU_Simulator
             //reg a selects address of data to load into reg b
             m_MAR.setContents(m_GPR[m_rega].getContents());
             UpdateMAR?.Invoke(m_MAR.getContents());
+            Thread.Sleep(2000);
 
             m_GPR[m_regb].setContents(m_MAR.readFromMemory());
         }
@@ -656,6 +822,7 @@ namespace CPU_Simulator
             //reg a selects address to store contents of reg b
             m_MAR.setContents(m_GPR[m_rega].getContents());
             UpdateMAR?.Invoke(m_MAR.getContents());
+            Thread.Sleep(2000);
 
             m_MAR.writeToMemory(m_GPR[m_regb].getContents());
         }
@@ -665,6 +832,7 @@ namespace CPU_Simulator
             //instruction is data, store data in reg b and get next instruction addr
             m_MAR.setContents(m_IAR.getContents());
             UpdateMAR?.Invoke(m_MAR.getContents());
+            Thread.Sleep(2000);
 
             incrementIAR();
             m_GPR[m_regb].setContents(m_MAR.readFromMemory());
@@ -675,9 +843,11 @@ namespace CPU_Simulator
             //jump to address stored in reg b
             m_MAR.setContents(m_GPR[m_regb].getContents());
             UpdateMAR?.Invoke(m_MAR.getContents());
+            Thread.Sleep(2000);
 
             m_IAR.setContents(m_MAR.readFromMemory());
             UpdateIAR?.Invoke(m_IAR.getContents());
+            Thread.Sleep(2000);
         }
 
         private void jump()
@@ -685,9 +855,11 @@ namespace CPU_Simulator
             //jump to address in instruction
             m_MAR.setContents(m_IAR.getContents());
             UpdateMAR?.Invoke(m_MAR.getContents());
+            Thread.Sleep(2000);
 
             m_IAR.setContents(m_MAR.readFromMemory());
             UpdateIAR?.Invoke(m_IAR.getContents());
+            Thread.Sleep(2000);
         }
 
         private void jumpIf(BitArray condition)
@@ -705,9 +877,11 @@ namespace CPU_Simulator
                 {
                     m_MAR.setContents(m_IAR.getContents());
                     UpdateMAR?.Invoke(m_MAR.getContents());
+                    Thread.Sleep(2000);
 
                     m_IAR.setContents(m_MAR.readFromMemory());
                     UpdateIAR?.Invoke(m_IAR.getContents());
+                    Thread.Sleep(2000);
                 }
 
                 //move to next instruction
