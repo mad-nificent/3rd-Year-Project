@@ -76,22 +76,114 @@ namespace CPU_Simulator
             g = e.Graphics;
 
             Pen myPen = new Pen(Color.Black);
-            myPen.Width = 2;
+            myPen.Width = 1;
 
-            //line from top left to MAR
-            g.DrawLine(myPen, 30, 41, 562, 41);
-            //line from RAM to bottom right
-            g.DrawLine(myPen, 900, 66, 900, 440);
-            //line from bottom right to bottom left
-            g.DrawLine(myPen, 900, 440, 30, 440);
-            //line from bottom left to top left
-            g.DrawLine(myPen, 30, 440, 30, 41);
+            //bus
+            //---------------------------------
+            //line from MAR to top left
+            g.DrawLine(myPen, 415, 40, 15, 40);
+            g.DrawLine(myPen, 415, 35, 10, 35);
+
+            //line from top left to bottom
+            g.DrawLine(myPen, 15, 40, 15, 465);
+            g.DrawLine(myPen, 10, 35, 10, 470);
+
+            //line from bottom left to right
+            g.DrawLine(myPen, 10, 470, 760, 470);
+            g.DrawLine(myPen, 15, 465, 755, 465);
+
+            //line from bottom right to RAM
+            g.DrawLine(myPen, 760, 470, 760, 60);
+            g.DrawLine(myPen, 755, 465, 755, 60);
+            //---------------------------------
+
+            //line from bus to tmp
+            g.DrawLine(myPen, 117.5f, 35, 117.5f, 75);
+            g.DrawLine(myPen, 122.5f, 35, 122.5f, 75);
+
+            //line from bus to ALU
+            g.DrawLine(myPen, 57.5f, 35, 57.5f, 180);
+            g.DrawLine(myPen, 62.5f, 35, 62.5f, 180);
+
+            //line from tmp to bus1
+            g.DrawLine(myPen, 117.5f, 110, 117.5f, 130);
+            g.DrawLine(myPen, 122.5f, 110, 122.5f, 130);
+
+            //line from bus1 to ALU
+            g.DrawLine(myPen, 117.5f, 155, 117.5f, 180);
+            g.DrawLine(myPen, 122.5f, 155, 122.5f, 180);
+
+            //line from ALU to ACC
+            g.DrawLine(myPen, 87.5f, 375, 87.5f, 395);
+            g.DrawLine(myPen, 92.5f, 375, 92.5f, 395);
+
+            //line from ACC to bus
+            g.DrawLine(myPen, 87.5f, 445, 87.5f, 470);
+            g.DrawLine(myPen, 92.5f, 445, 92.5f, 470);
+
+            //line from bus to between IAR and IR
+            g.DrawLine(myPen, 447.5f, 470, 447.5f, 422.5f);
+            g.DrawLine(myPen, 452.5f, 470, 452.5f, 422.5f);
+
+            //line from bus to IAR
+            g.DrawLine(myPen, 452.5f, 422.5f, 430, 422.5f);
+            g.DrawLine(myPen, 452.5f, 427.5f, 430, 427.5f);
+
+            //line from bus to IR
+            g.DrawLine(myPen, 447.5f, 422.5f, 470, 422.5f);
+            g.DrawLine(myPen, 447.5f, 427.5f, 470, 427.5f);
+
+            //line from bus to GPR1
+            g.DrawLine(myPen, 735, 182.5f, 760, 182.5f);
+            g.DrawLine(myPen, 735, 187.5f, 760, 187.5f);
+
+            //line from bus to GPR2
+            g.DrawLine(myPen, 735, 242.5f, 760, 242.5f);
+            g.DrawLine(myPen, 735, 247.5f, 760, 247.5f);
+
+            //line from bus to GPR3
+            g.DrawLine(myPen, 735, 302.5f, 760, 302.5f);
+            g.DrawLine(myPen, 735, 307.5f, 760, 307.5f);
+
+            //line from bus to GPR4
+            g.DrawLine(myPen, 735, 362.5f, 760, 362.5f);
+            g.DrawLine(myPen, 735, 367.5f, 760, 367.5f);
         }
 
         private void btnStart_Click(object sender, EventArgs e)
         {
             Thread CPUThread = new Thread(new ThreadStart(m_CU.start));
             CPUThread.Start();
+        }
+
+        private void label1_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void MainForm_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        private void pnlGPR2_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void pnlGPR3_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void pnlGPR1_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void pnlGPR4_Paint(object sender, PaintEventArgs e)
+        {
+
         }
     }
 
