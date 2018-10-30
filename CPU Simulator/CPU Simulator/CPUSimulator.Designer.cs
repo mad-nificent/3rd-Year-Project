@@ -564,7 +564,7 @@
             // 
             this.lblRAMSet.AutoSize = true;
             this.lblRAMSet.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblRAMSet.Location = new System.Drawing.Point(22, 24);
+            this.lblRAMSet.Location = new System.Drawing.Point(22, 25);
             this.lblRAMSet.Name = "lblRAMSet";
             this.lblRAMSet.Size = new System.Drawing.Size(17, 20);
             this.lblRAMSet.TabIndex = 5;
@@ -574,7 +574,7 @@
             // 
             this.lblRAMEnable.AutoSize = true;
             this.lblRAMEnable.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblRAMEnable.Location = new System.Drawing.Point(4, 24);
+            this.lblRAMEnable.Location = new System.Drawing.Point(4, 25);
             this.lblRAMEnable.Name = "lblRAMEnable";
             this.lblRAMEnable.Size = new System.Drawing.Size(18, 20);
             this.lblRAMEnable.TabIndex = 4;
@@ -681,15 +681,15 @@
             // 
             this.txtInput.BackColor = System.Drawing.SystemColors.HighlightText;
             this.txtInput.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.txtInput.Location = new System.Drawing.Point(940, 12);
+            this.txtInput.Location = new System.Drawing.Point(784, 10);
             this.txtInput.Name = "txtInput";
-            this.txtInput.Size = new System.Drawing.Size(347, 537);
+            this.txtInput.Size = new System.Drawing.Size(347, 473);
             this.txtInput.TabIndex = 16;
             this.txtInput.Text = "";
             // 
             // btnStart
             // 
-            this.btnStart.Location = new System.Drawing.Point(798, 473);
+            this.btnStart.Location = new System.Drawing.Point(800, 450);
             this.btnStart.Name = "btnStart";
             this.btnStart.Size = new System.Drawing.Size(75, 23);
             this.btnStart.TabIndex = 17;
@@ -701,7 +701,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1299, 561);
+            this.ClientSize = new System.Drawing.Size(1137, 489);
             this.Controls.Add(this.btnStart);
             this.Controls.Add(this.txtInput);
             this.Controls.Add(this.pnlBUS1);
