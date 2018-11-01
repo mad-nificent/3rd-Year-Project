@@ -29,6 +29,8 @@
         private void InitializeComponent()
         {
             this.pnlRAM = new System.Windows.Forms.Panel();
+            this.lblRAMContents = new System.Windows.Forms.Label();
+            this.lblAddr = new System.Windows.Forms.Label();
             this.lblRAM = new System.Windows.Forms.Label();
             this.pnlCU = new System.Windows.Forms.Panel();
             this.lblCU = new System.Windows.Forms.Label();
@@ -50,17 +52,40 @@
             // pnlRAM
             // 
             this.pnlRAM.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.pnlRAM.Controls.Add(this.lblRAMContents);
+            this.pnlRAM.Controls.Add(this.lblAddr);
             this.pnlRAM.Controls.Add(this.lblRAM);
             this.pnlRAM.Location = new System.Drawing.Point(495, 10);
             this.pnlRAM.Name = "pnlRAM";
             this.pnlRAM.Size = new System.Drawing.Size(270, 50);
             this.pnlRAM.TabIndex = 11;
             // 
+            // lblRAMContents
+            // 
+            this.lblRAMContents.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.lblRAMContents.Location = new System.Drawing.Point(164, 15);
+            this.lblRAMContents.Name = "lblRAMContents";
+            this.lblRAMContents.Size = new System.Drawing.Size(60, 20);
+            this.lblRAMContents.TabIndex = 6;
+            this.lblRAMContents.Text = "00000000";
+            this.lblRAMContents.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            // 
+            // lblAddr
+            // 
+            this.lblAddr.AutoSize = true;
+            this.lblAddr.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblAddr.Location = new System.Drawing.Point(107, 16);
+            this.lblAddr.Name = "lblAddr";
+            this.lblAddr.Size = new System.Drawing.Size(54, 18);
+            this.lblAddr.TabIndex = 5;
+            this.lblAddr.Text = "Addr 0:";
+            this.lblAddr.TextAlign = System.Drawing.ContentAlignment.TopCenter;
+            // 
             // lblRAM
             // 
             this.lblRAM.AutoSize = true;
             this.lblRAM.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblRAM.Location = new System.Drawing.Point(112, 16);
+            this.lblRAM.Location = new System.Drawing.Point(38, 16);
             this.lblRAM.Name = "lblRAM";
             this.lblRAM.Size = new System.Drawing.Size(41, 18);
             this.lblRAM.TabIndex = 4;
@@ -223,6 +248,8 @@
         private System.Windows.Forms.Label lblClock;
         private System.Windows.Forms.Button btnIncrease;
         private System.Windows.Forms.Button btnDecrease;
+        private System.Windows.Forms.Label lblRAMContents;
+        private System.Windows.Forms.Label lblAddr;
     }
 }
 
