@@ -12,12 +12,13 @@ using System.Threading;
 
 namespace CPU_Simulator
 {
+    public delegate void EnableBus();
     public delegate void UpdateRegisterContents(BitArray data);
     public delegate void UpdateGPRContents(BitArray data, int index);
 
     public partial class MainForm : Form
     {
-        System.Timers.Timer timer = new System.Timers.Timer();
+        System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
 
         private ControlUnit m_CU;
 
@@ -51,6 +52,7 @@ namespace CPU_Simulator
         public MainForm()
         {
             InitializeComponent();
+            Paint += drawBus;
             drawCPU();
 
             BitArray loadintoreg1 = new BitArray(new bool[] { false, false, false, false, false, true, false, false });
@@ -60,11 +62,12 @@ namespace CPU_Simulator
             BitArray ADD = new BitArray(new bool[] { true, false, false, false, false, false, false, true });
 
             BitArray[] instructions = new BitArray[] { loadintoreg1, inputa, loadintoreg2, inputb, ADD };
-            m_CU = new ControlUnit(instructions, setRAM, readRAM, updateAcc);
+            m_CU = new ControlUnit(instructions, setRAM, readRAM, updateAcc, enableBus);
 
-            timer.Elapsed += new System.Timers.ElapsedEventHandler(resetColours);
             timer.Interval = Globals.clockspeed;
+            timer.Tick += new EventHandler(resetColours);
             timer.Enabled = true;
+            timer.Start();
 
             m_CU.UpdateIAR += updateIAR;
             m_CU.UpdateIR += updateIR;
@@ -75,8 +78,12 @@ namespace CPU_Simulator
 
         private void drawCPU()
         {
+            SuspendLayout();
+
             //TMP register
             //--------------------------------------------
+            pnlTmp.SuspendLayout();
+        
             pnlTmp.BorderStyle = BorderStyle.FixedSingle;
             pnlTmp.Location = new Point(80, 60);
             pnlTmp.Size = new Size(80, 50);
@@ -95,10 +102,15 @@ namespace CPU_Simulator
             lblTmpContents.Location = new Point(10, 26);
             lblTmpContents.Size = new Size(60, 20);
             pnlTmp.Controls.Add(lblTmpContents);
+
+            pnlTmp.ResumeLayout();
+            pnlTmp.PerformLayout();
             //--------------------------------------------
 
             //BUS1 register
             //--------------------------------------------
+            pnlBus1.SuspendLayout();
+
             pnlBus1.BorderStyle = BorderStyle.FixedSingle;
             pnlBus1.Location = new Point(91, 130);
             pnlBus1.Size = new Size(60, 25);
@@ -110,10 +122,15 @@ namespace CPU_Simulator
             lblBus1.Location = new Point(5, 1);
             lblBus1.Size = new Size(50, 20);
             pnlBus1.Controls.Add(lblBus1);
+
+            pnlBus1.ResumeLayout();
+            pnlBus1.PerformLayout();
             //--------------------------------------------
 
             //ACC register
             //--------------------------------------------
+            pnlAcc.SuspendLayout();
+
             pnlAcc.BorderStyle = BorderStyle.FixedSingle;
             pnlAcc.Location = new Point(50, 395);
             pnlAcc.Size = new Size(80, 50);
@@ -132,10 +149,15 @@ namespace CPU_Simulator
             lblAccContents.Location = new Point(10, 26);
             lblAccContents.Size = new Size(60, 20);
             pnlAcc.Controls.Add(lblAccContents);
+
+            pnlAcc.ResumeLayout();
+            pnlAcc.PerformLayout();
             //--------------------------------------------
 
             //IAR register
             //--------------------------------------------
+            pnlIar.SuspendLayout();
+
             pnlIar.BorderStyle = BorderStyle.FixedSingle;
             pnlIar.Location = new Point(350, 395);
             pnlIar.Size = new Size(80, 50);
@@ -154,10 +176,15 @@ namespace CPU_Simulator
             lblIarContents.Location = new Point(10, 26);
             lblIarContents.Size = new Size(60, 20);
             pnlIar.Controls.Add(lblIarContents);
+
+            pnlIar.ResumeLayout();
+            pnlIar.PerformLayout();
             //--------------------------------------------
 
             //IR register
             //--------------------------------------------
+            pnlIr.SuspendLayout();
+
             pnlIr.BorderStyle = BorderStyle.FixedSingle;
             pnlIr.Location = new Point(470, 395);
             pnlIr.Size = new Size(80, 50);
@@ -176,10 +203,15 @@ namespace CPU_Simulator
             lblIrContents.Location = new Point(10, 26);
             lblIrContents.Size = new Size(60, 20);
             pnlIr.Controls.Add(lblIrContents);
+
+            pnlIr.ResumeLayout();
+            pnlIr.PerformLayout();
             //--------------------------------------------
 
             //MAR register
             //--------------------------------------------
+            pnlMar.SuspendLayout();
+
             pnlMar.BorderStyle = BorderStyle.FixedSingle;
             pnlMar.Location = new Point(415, 10);
             pnlMar.Size = new Size(80, 50);
@@ -198,6 +230,9 @@ namespace CPU_Simulator
             lblMarContents.Location = new Point(10, 26);
             lblMarContents.Size = new Size(60, 20);
             pnlMar.Controls.Add(lblMarContents);
+
+            pnlMar.ResumeLayout();
+            pnlMar.PerformLayout();
             //--------------------------------------------
 
             for (int count = 0; count < Globals.NO_OF_GPR; count++)
@@ -209,6 +244,8 @@ namespace CPU_Simulator
 
             //GPR registers
             //--------------------------------------------
+            pnlGPR[0].SuspendLayout();
+
             pnlGPR[0].BorderStyle = BorderStyle.FixedSingle;
             pnlGPR[0].Location = new Point(655, 160);
             pnlGPR[0].Size = new Size(80, 50);
@@ -227,6 +264,12 @@ namespace CPU_Simulator
             lblGPRContents[0].Location = new Point(10, 26);
             lblGPRContents[0].Size = new Size(60, 20);
             pnlGPR[0].Controls.Add(lblGPRContents[0]);
+
+            pnlGPR[0].ResumeLayout();
+            pnlGPR[0].PerformLayout();
+
+            //--------------------------------------------
+            pnlGPR[1].SuspendLayout();
 
             pnlGPR[1].BorderStyle = BorderStyle.FixedSingle;
             pnlGPR[1].Location = new Point(655, 220);
@@ -247,6 +290,12 @@ namespace CPU_Simulator
             lblGPRContents[1].Size = new Size(60, 20);
             pnlGPR[1].Controls.Add(lblGPRContents[1]);
 
+            pnlGPR[1].ResumeLayout();
+            pnlGPR[1].PerformLayout();
+
+            //--------------------------------------------
+            pnlGPR[2].SuspendLayout();
+
             pnlGPR[2].BorderStyle = BorderStyle.FixedSingle;
             pnlGPR[2].Location = new Point(655, 280);
             pnlGPR[2].Size = new Size(80, 50);
@@ -266,6 +315,12 @@ namespace CPU_Simulator
             lblGPRContents[2].Size = new Size(60, 20);
             pnlGPR[2].Controls.Add(lblGPRContents[2]);
 
+            pnlGPR[2].ResumeLayout();
+            pnlGPR[2].PerformLayout();
+
+            //--------------------------------------------
+            pnlGPR[3].SuspendLayout();
+
             pnlGPR[3].BorderStyle = BorderStyle.FixedSingle;
             pnlGPR[3].Location = new Point(655, 340);
             pnlGPR[3].Size = new Size(80, 50);
@@ -284,7 +339,14 @@ namespace CPU_Simulator
             lblGPRContents[3].Location = new Point(10, 26);
             lblGPRContents[3].Size = new Size(60, 20);
             pnlGPR[3].Controls.Add(lblGPRContents[3]);
+
+            pnlGPR[3].ResumeLayout();
+            pnlGPR[3].PerformLayout();
             //--------------------------------------------
+
+            Invalidate();
+            ResumeLayout();
+            PerformLayout();
         }
 
         private void btnDecrease_Click(object sender, EventArgs e)
@@ -314,12 +376,91 @@ namespace CPU_Simulator
             CPUThread.Start();
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        private void drawBus(object sender, PaintEventArgs e)
         {
-            base.OnPaint(e);
+            Graphics g = CreateGraphics();
 
-            Graphics g;
-            g = e.Graphics;
+            Pen myPen = new System.Drawing.Pen(Color.Black);
+            myPen.Width = 1;
+
+            //bus
+            //---------------------------------
+            //line from MAR to top left
+            g.DrawLine(myPen, 415, 40, 15, 40);
+            g.DrawLine(myPen, 415, 35, 10, 35);
+
+            //line from top left to bottom
+            g.DrawLine(myPen, 15, 40, 15, 465);
+            g.DrawLine(myPen, 10, 35, 10, 470);
+
+            //line from bottom left to right
+            g.DrawLine(myPen, 10, 470, 760, 470);
+            g.DrawLine(myPen, 15, 465, 755, 465);
+
+            //line from bottom right to RAM
+            g.DrawLine(myPen, 760, 470, 760, 60);
+            g.DrawLine(myPen, 755, 465, 755, 60);
+            //---------------------------------
+
+            //bus to other components
+            //----------------------------------------
+            //line from bus to tmp
+            g.DrawLine(myPen, 117.5f, 35, 117.5f, 75);
+            g.DrawLine(myPen, 122.5f, 35, 122.5f, 75);
+
+            //line from bus to ALU
+            g.DrawLine(myPen, 57.5f, 35, 57.5f, 180);
+            g.DrawLine(myPen, 62.5f, 35, 62.5f, 180);
+
+            //line from tmp to bus1
+            g.DrawLine(myPen, 117.5f, 110, 117.5f, 130);
+            g.DrawLine(myPen, 122.5f, 110, 122.5f, 130);
+
+            //line from bus1 to ALU
+            g.DrawLine(myPen, 117.5f, 155, 117.5f, 180);
+            g.DrawLine(myPen, 122.5f, 155, 122.5f, 180);
+
+            //line from ALU to ACC
+            g.DrawLine(myPen, 87.5f, 375, 87.5f, 395);
+            g.DrawLine(myPen, 92.5f, 375, 92.5f, 395);
+
+            //line from ACC to bus
+            g.DrawLine(myPen, 87.5f, 445, 87.5f, 470);
+            g.DrawLine(myPen, 92.5f, 445, 92.5f, 470);
+
+            //line from bus to between IAR and IR
+            g.DrawLine(myPen, 447.5f, 470, 447.5f, 422.5f);
+            g.DrawLine(myPen, 452.5f, 470, 452.5f, 422.5f);
+
+            //line from bus to IAR
+            g.DrawLine(myPen, 452.5f, 422.5f, 430, 422.5f);
+            g.DrawLine(myPen, 452.5f, 427.5f, 430, 427.5f);
+
+            //line from bus to IR
+            g.DrawLine(myPen, 447.5f, 422.5f, 470, 422.5f);
+            g.DrawLine(myPen, 447.5f, 427.5f, 470, 427.5f);
+
+            //line from bus to GPR1
+            g.DrawLine(myPen, 735, 182.5f, 760, 182.5f);
+            g.DrawLine(myPen, 735, 187.5f, 760, 187.5f);
+
+            //line from bus to GPR2
+            g.DrawLine(myPen, 735, 242.5f, 760, 242.5f);
+            g.DrawLine(myPen, 735, 247.5f, 760, 247.5f);
+
+            //line from bus to GPR3
+            g.DrawLine(myPen, 735, 302.5f, 760, 302.5f);
+            g.DrawLine(myPen, 735, 307.5f, 760, 307.5f);
+
+            //line from bus to GPR4
+            g.DrawLine(myPen, 735, 362.5f, 760, 362.5f);
+            g.DrawLine(myPen, 735, 367.5f, 760, 367.5f);
+            //----------------------------------------
+        }
+
+        public void drawBus()
+        {
+            Graphics g = CreateGraphics();
 
             Pen myPen = new Pen(Color.Black);
             myPen.Width = 1;
@@ -399,8 +540,10 @@ namespace CPU_Simulator
             //----------------------------------------
         }
 
-        public void resetColours(object source, System.Timers.ElapsedEventArgs e)
+        public void resetColours(object source, EventArgs e)
         {
+            SuspendLayout();
+
             lblTmpContents.ForeColor = Color.Black;
             lblAccContents.ForeColor = Color.Black;
             lblIarContents.ForeColor = Color.Black;
@@ -412,6 +555,9 @@ namespace CPU_Simulator
             {
                 lblGPRContents[count].ForeColor = Color.Black;
             }
+
+            ResumeLayout();
+            drawBus();
         }
 
         public void updateIAR(BitArray data)
@@ -498,6 +644,92 @@ namespace CPU_Simulator
                 }
             }
         }
+
+        public void enableBus()
+        {
+            if (InvokeRequired) Invoke(new EnableBus(enableBus));
+            else
+            {
+                Graphics g = CreateGraphics();
+
+                Pen myPen = new Pen(Color.Red);
+                myPen.Width = 1;
+
+                //bus
+                //---------------------------------
+                //line from MAR to top left
+                g.DrawLine(myPen, 415, 40, 15, 40);
+                g.DrawLine(myPen, 415, 35, 10, 35);
+
+                //line from top left to bottom
+                g.DrawLine(myPen, 15, 40, 15, 465);
+                g.DrawLine(myPen, 10, 35, 10, 470);
+
+                //line from bottom left to right
+                g.DrawLine(myPen, 10, 470, 760, 470);
+                g.DrawLine(myPen, 15, 465, 755, 465);
+
+                //line from bottom right to RAM
+                g.DrawLine(myPen, 760, 470, 760, 60);
+                g.DrawLine(myPen, 755, 465, 755, 60);
+                //---------------------------------
+
+                //bus to other components
+                //----------------------------------------
+                //line from bus to tmp
+                g.DrawLine(myPen, 117.5f, 35, 117.5f, 75);
+                g.DrawLine(myPen, 122.5f, 35, 122.5f, 75);
+
+                //line from bus to ALU
+                g.DrawLine(myPen, 57.5f, 35, 57.5f, 180);
+                g.DrawLine(myPen, 62.5f, 35, 62.5f, 180);
+
+                //line from tmp to bus1
+                g.DrawLine(myPen, 117.5f, 110, 117.5f, 130);
+                g.DrawLine(myPen, 122.5f, 110, 122.5f, 130);
+
+                //line from bus1 to ALU
+                g.DrawLine(myPen, 117.5f, 155, 117.5f, 180);
+                g.DrawLine(myPen, 122.5f, 155, 122.5f, 180);
+
+                //line from ALU to ACC
+                g.DrawLine(myPen, 87.5f, 375, 87.5f, 395);
+                g.DrawLine(myPen, 92.5f, 375, 92.5f, 395);
+
+                //line from ACC to bus
+                g.DrawLine(myPen, 87.5f, 445, 87.5f, 470);
+                g.DrawLine(myPen, 92.5f, 445, 92.5f, 470);
+
+                //line from bus to between IAR and IR
+                g.DrawLine(myPen, 447.5f, 470, 447.5f, 422.5f);
+                g.DrawLine(myPen, 452.5f, 470, 452.5f, 422.5f);
+
+                //line from bus to IAR
+                g.DrawLine(myPen, 452.5f, 422.5f, 430, 422.5f);
+                g.DrawLine(myPen, 452.5f, 427.5f, 430, 427.5f);
+
+                //line from bus to IR
+                g.DrawLine(myPen, 447.5f, 422.5f, 470, 422.5f);
+                g.DrawLine(myPen, 447.5f, 427.5f, 470, 427.5f);
+
+                //line from bus to GPR1
+                g.DrawLine(myPen, 735, 182.5f, 760, 182.5f);
+                g.DrawLine(myPen, 735, 187.5f, 760, 187.5f);
+
+                //line from bus to GPR2
+                g.DrawLine(myPen, 735, 242.5f, 760, 242.5f);
+                g.DrawLine(myPen, 735, 247.5f, 760, 247.5f);
+
+                //line from bus to GPR3
+                g.DrawLine(myPen, 735, 302.5f, 760, 302.5f);
+                g.DrawLine(myPen, 735, 307.5f, 760, 307.5f);
+
+                //line from bus to GPR4
+                g.DrawLine(myPen, 735, 362.5f, 760, 362.5f);
+                g.DrawLine(myPen, 735, 367.5f, 760, 367.5f);
+                //----------------------------------------
+            }
+        }
     }
 
     public static class Globals
@@ -545,13 +777,17 @@ namespace CPU_Simulator
 
     public class Register
     {
+        public event EnableBus EnableRegister;
+
         private BitArray contents = new BitArray(Globals.BYTE_LENGTH);
 
-        public Register() {}
-        public Register(BitArray contents) { this.contents = contents; }
-
+        public Register(EnableBus eventhandler) { EnableRegister += eventhandler; }
         public void set(BitArray contents) { this.contents = contents; }
-        public BitArray enable() { return contents; }
+        public BitArray enable()
+        {
+            EnableRegister?.Invoke();
+            return contents;
+        }
     }
 
     public class RAM
@@ -561,21 +797,18 @@ namespace CPU_Simulator
 
         private Register[] m_locations = new Register[Globals.RAM_SIZE];
 
-        public RAM(BitArray[] instructions)
+        public RAM(BitArray[] instructions, EnableBus eventhandler)
         {
             //fill RAM with instructions
             for (int count = 0; count < instructions.Length; count++)
             {
-                m_locations[count] = new Register();
+                m_locations[count] = new Register(eventhandler);
                 m_locations[count].set(instructions[count]);
             }
 
             //fill RAM with empty registers
             for (int count = instructions.Length; count < Globals.RAM_SIZE; count++)
-            {
-                m_locations[count] = new Register();
-                m_locations[count].set(new BitArray(Globals.BYTE_LENGTH));
-            }
+                m_locations[count] = new Register(eventhandler);
         }
 
         public void writeToLocation(BitArray address, BitArray data)
@@ -585,7 +818,7 @@ namespace CPU_Simulator
             address.CopyTo(addr, 0);
 
             //access address and put the data
-             m_locations[addr[0]].set(data);
+            m_locations[addr[0]].set(data);
 
             SetRAM?.Invoke(data, addr[0]);
         }
@@ -607,9 +840,10 @@ namespace CPU_Simulator
     {
         private RAM m_RAM;
 
-        public MAR(BitArray[] instructions, UpdateGPRContents setram, UpdateGPRContents getram)
+        public MAR(BitArray[] instructions, UpdateGPRContents setram, UpdateGPRContents getram, 
+            EnableBus enablebus) : base(enablebus)
         {
-            m_RAM = new RAM(instructions);
+            m_RAM = new RAM(instructions, enablebus);
             m_RAM.SetRAM += setram;
             m_RAM.GetRAM += getram;
         }
@@ -627,11 +861,13 @@ namespace CPU_Simulator
         //change to private (find workaround)
         public bool bus1 = false;
         public bool[] m_flags = new bool[Globals.NO_OF_FLAGS];
-        public Register m_temp = new Register(new BitArray(Globals.BYTE_LENGTH));
-        public Register m_accumulator = new Register(new BitArray(Globals.BYTE_LENGTH));
+        public Register m_temp, m_accumulator;
 
-        public ALU()
+        public ALU(EnableBus eventhandler)
         {
+            m_temp = new Register(eventhandler);
+            m_accumulator = new Register(eventhandler);
+
             //set flags to false
             for (int count = 0; count < Globals.NO_OF_FLAGS; count++)
                 m_flags[count] = false;
@@ -816,24 +1052,29 @@ namespace CPU_Simulator
 
         public readonly BitArray lastaddress = new BitArray(Globals.BYTE_LENGTH);
 
-        private ALU m_ALU = new ALU();
         private byte m_rega, m_regb;
         private bool programend = false;
-        private MAR m_MAR;
-        private Register[] m_GPR = new Register[Globals.NO_OF_GPR];
-        private Register m_IAR = new Register(new BitArray(Globals.BYTE_LENGTH));
-        private Register m_IR = new Register(new BitArray(Globals.BYTE_LENGTH));
 
-        public ControlUnit(BitArray[] instructions, UpdateGPRContents setram, UpdateGPRContents getram, UpdateRegisterContents ACCevent)
+        private ALU m_ALU;
+        private MAR m_MAR;
+        private Register m_IAR, m_IR;
+        private Register[] m_GPR = new Register[Globals.NO_OF_GPR];
+
+        public ControlUnit(BitArray[] instructions, UpdateGPRContents setram, UpdateGPRContents getram, 
+            UpdateRegisterContents ACCevent, EnableBus enablebus)
         {
+            m_ALU = new ALU(enablebus);
             m_ALU.UpdateACC += ACCevent;
-            m_MAR = new MAR(instructions, setram, getram);
+
+            m_MAR = new MAR(instructions, setram, getram, enablebus);
+            m_IAR = new Register(enablebus);
+            m_IR = new Register(enablebus);
 
             lastaddress = new BitArray(new byte[] { (byte)(instructions.Length - 1) });
 
             //initialise GPRs
             for (int count = 0; count < Globals.NO_OF_GPR; count++)
-                m_GPR[count] = new Register(new BitArray(Globals.BYTE_LENGTH));
+                m_GPR[count] = new Register(enablebus);
         }
 
         public void start()
