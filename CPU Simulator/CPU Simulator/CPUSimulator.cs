@@ -56,12 +56,13 @@ namespace CPU_Simulator
             drawCPU();
 
             BitArray loadintoreg1 = new BitArray(new bool[] { false, false, false, false, false, true, false, false });
-            BitArray inputa = new BitArray(new bool[] { true, false, true, false, false, false, false, false });
-            BitArray loadintoreg2 = new BitArray(new bool[] { true, false, false, false, false, true, false, false });
-            BitArray inputb = new BitArray(new bool[] { false, false, false, true, false, false, false, false });
-            BitArray ADD = new BitArray(new bool[] { true, false, false, false, false, false, false, true });
+            BitArray inputa = new BitArray(new bool[] { false, false, true, false, false, false, false, false });
+            BitArray jumptoaddr = new BitArray(new bool[] { false, false, false, false, true, true, false, false });
+            BitArray empty = new BitArray(new bool[] { false, false, false, false, false, false, false, false });
+            BitArray loadintoreg3 = new BitArray(new bool[] { false, true, false, false, false, true, false, false });
+            BitArray inputc = new BitArray(new bool[] { false, false, false, false, false, false, false, true });
 
-            BitArray[] instructions = new BitArray[] { loadintoreg1, inputa, loadintoreg2, inputb, ADD };
+            BitArray[] instructions = new BitArray[] { loadintoreg1, inputa, jumptoaddr, empty, loadintoreg3, inputc };
             m_CU = new ControlUnit(instructions, setRAM, readRAM, updateAcc, enableBus);
 
             timer.Interval = Globals.clockspeed;
@@ -856,7 +857,7 @@ namespace CPU_Simulator
     {
         public event UpdateRegisterContents UpdateACC;
 
-        public static class Flags { public const int COUT = 0, EQUAL = 1, A_LARGER = 2, ZERO = 3; }
+        public static class Flags { public const int COUT = 3, EQUAL = 2, A_LARGER = 1, ZERO = 0; }
 
         //change to private (find workaround)
         public bool bus1 = false;
@@ -1265,12 +1266,7 @@ namespace CPU_Simulator
 
         private void jumpRegister()
         {
-            //jump to address stored in reg b
-            m_MAR.set(m_GPR[m_regb].enable());
-            UpdateMAR?.Invoke(m_MAR.enable());
-            Thread.Sleep(Globals.clockspeed);
-
-            m_IAR.set(m_MAR.readFromMemory());
+            m_IAR.set(m_GPR[m_regb].enable());
             UpdateIAR?.Invoke(m_IAR.enable());
             Thread.Sleep(Globals.clockspeed);
         }
