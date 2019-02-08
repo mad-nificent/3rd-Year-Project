@@ -12,69 +12,75 @@ using System.Threading;
 
 namespace CPU_Simulator
 {
-    public delegate void EnableBus();
-    public delegate void UpdateRegisterContents(BitArray data);
-    public delegate void UpdateGPRContents(BitArray data, int index);
+    public delegate void EnableRegister();
+    public delegate void SetRegister(BitArray data);
+    public delegate void SetEnableGPR(BitArray data, int index);    //this is used to set GUI contents of RAM and GPR, and also to show contents being read from RAM
 
     public partial class MainForm : Form
     {
         System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
 
-        private ControlUnit m_CU;
+        private ControlUnit CU;
 
-        private Panel pnlTmp = new Panel();
-        private Label lblTmp = new Label();
-        private Label lblTmpContents = new Label();
+        //CPU components
+        //--------------------------------
+        private Panel pnlTMP = new Panel();
+        private Label lblTMP = new Label();
+        private Label lblTMPContents = new Label();
 
-        private Panel pnlBus1 = new Panel();
-        private Label lblBus1 = new Label();
+        private Panel pnlBUS1 = new Panel();
+        private Label lblBUS1 = new Label();
 
-        private Panel pnlAcc = new Panel();
-        private Label lblAcc = new Label();
-        private Label lblAccContents = new Label();
+        private Panel pnlAccumulator = new Panel();
+        private Label lblAccumulator = new Label();
+        private Label lblAccumulatorContents = new Label();
 
-        private Panel pnlIar = new Panel();
-        private Label lblIar = new Label();
-        private Label lblIarContents = new Label();
+        private Panel pnlIAR = new Panel();
+        private Label lblIAR = new Label();
+        private Label lblIARContents = new Label();
 
-        private Panel pnlIr = new Panel();
-        private Label lblIr = new Label();
-        private Label lblIrContents = new Label();
+        private Panel pnlIR = new Panel();
+        private Label lblIR = new Label();
+        private Label lblIRContents = new Label();
 
-        private Panel pnlMar = new Panel();
-        private Label lblMar = new Label();
-        private Label lblMarContents = new Label();
+        private Panel pnlMAR = new Panel();
+        private Label lblMAR = new Label();
+        private Label lblMARContents = new Label();
 
         private Panel[] pnlGPR = new Panel[Globals.NO_OF_GPR];
         private Label[] lblGPR = new Label[Globals.NO_OF_GPR];
         private Label[] lblGPRContents = new Label[Globals.NO_OF_GPR];
+        //--------------------------------
 
         public MainForm()
         {
             InitializeComponent();
-            Paint += drawBus;
+            Paint += drawBus;           //bus will be reset on redraw
+
             drawCPU();
 
-            BitArray loadintoreg1 = new BitArray(new bool[] { false, false, false, false, false, true, false, false });
-            BitArray inputa = new BitArray(new bool[] { false, false, true, false, false, false, false, false });
-            BitArray jumptoaddr = new BitArray(new bool[] { false, false, false, false, true, true, false, false });
-            BitArray empty = new BitArray(new bool[] { false, false, false, false, false, false, false, false });
-            BitArray loadintoreg3 = new BitArray(new bool[] { false, true, false, false, false, true, false, false });
-            BitArray inputc = new BitArray(new bool[] { false, false, false, false, false, false, false, true });
+            //instructions
+            BitArray loadintoreg1 = new BitArray(new bool[] { false, false, false, false, false, true,  false, false });
+            BitArray inputa       = new BitArray(new bool[] { false, false, true,  false, false, false, false, false });
+            BitArray jumptoaddr   = new BitArray(new bool[] { false, false, false, false, true,  true,  false, false });
+            BitArray empty        = new BitArray(new bool[] { false, false, false, false, false, false, false, false });
+            BitArray loadintoreg3 = new BitArray(new bool[] { false, true,  false, false, false, true,  false, false });
+            BitArray inputc       = new BitArray(new bool[] { false, false, false, false, false, false, false, true  });
 
+            //set instructions to load
             BitArray[] instructions = new BitArray[] { loadintoreg1, inputa, jumptoaddr, empty, loadintoreg3, inputc };
-            m_CU = new ControlUnit(instructions, setRAM, readRAM, updateAcc, enableBus);
+
+            //link GUI events to CPU registers
+            CU = new ControlUnit(instructions, readRAMLocation, overwriteRAMLocation, 
+                enableBus, updateIARContents, updateIRContents, updateMARContents,
+                updateTMPContents, updateAccumulatorContents);
 
             timer.Interval = Globals.clockspeed;
             timer.Tick += new EventHandler(resetColours);
             timer.Enabled = true;
             timer.Start();
 
-            m_CU.UpdateIAR += updateIAR;
-            m_CU.UpdateIR += updateIR;
-            m_CU.UpdateMAR += updateMAR;
-            m_CU.UpdateTMP += updateTMP;
-            m_CU.UpdateGPRs += updateGPR;
+            CU.WriteToGPR += updateGPRContents;
         }
 
         private void drawCPU()
@@ -83,157 +89,157 @@ namespace CPU_Simulator
 
             //TMP register
             //--------------------------------------------
-            pnlTmp.SuspendLayout();
+            pnlTMP.SuspendLayout();
         
-            pnlTmp.BorderStyle = BorderStyle.FixedSingle;
-            pnlTmp.Location = new Point(80, 60);
-            pnlTmp.Size = new Size(80, 50);
-            Controls.Add(pnlTmp);
+            pnlTMP.BorderStyle = BorderStyle.FixedSingle;
+            pnlTMP.Location = new Point(80, 60);
+            pnlTMP.Size = new Size(80, 50);
+            Controls.Add(pnlTMP);
 
-            lblTmp.Text = "TMP";
-            lblTmp.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, ((byte)(0)));
-            lblTmp.TextAlign = ContentAlignment.MiddleCenter;
-            lblTmp.Location = new Point(20, 4);
-            lblTmp.Size = new Size(40, 20);
-            pnlTmp.Controls.Add(lblTmp);
+            lblTMP.Text = "TMP";
+            lblTMP.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, ((byte)(0)));
+            lblTMP.TextAlign = ContentAlignment.MiddleCenter;
+            lblTMP.Location = new Point(20, 4);
+            lblTMP.Size = new Size(40, 20);
+            pnlTMP.Controls.Add(lblTMP);
 
-            lblTmpContents.Text = "00000000";
-            lblTmpContents.TextAlign = ContentAlignment.MiddleCenter;
-            lblTmpContents.BorderStyle = BorderStyle.FixedSingle;
-            lblTmpContents.Location = new Point(10, 26);
-            lblTmpContents.Size = new Size(60, 20);
-            pnlTmp.Controls.Add(lblTmpContents);
+            lblTMPContents.Text = "00000000";
+            lblTMPContents.TextAlign = ContentAlignment.MiddleCenter;
+            lblTMPContents.BorderStyle = BorderStyle.FixedSingle;
+            lblTMPContents.Location = new Point(10, 26);
+            lblTMPContents.Size = new Size(60, 20);
+            pnlTMP.Controls.Add(lblTMPContents);
 
-            pnlTmp.ResumeLayout();
-            pnlTmp.PerformLayout();
+            pnlTMP.ResumeLayout();
+            pnlTMP.PerformLayout();
             //--------------------------------------------
 
             //BUS1 register
             //--------------------------------------------
-            pnlBus1.SuspendLayout();
+            pnlBUS1.SuspendLayout();
 
-            pnlBus1.BorderStyle = BorderStyle.FixedSingle;
-            pnlBus1.Location = new Point(91, 130);
-            pnlBus1.Size = new Size(60, 25);
-            Controls.Add(pnlBus1);
+            pnlBUS1.BorderStyle = BorderStyle.FixedSingle;
+            pnlBUS1.Location = new Point(91, 130);
+            pnlBUS1.Size = new Size(60, 25);
+            Controls.Add(pnlBUS1);
 
-            lblBus1.Text = "BUS1";
-            lblBus1.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, ((byte)(0)));
-            lblBus1.TextAlign = ContentAlignment.MiddleCenter;
-            lblBus1.Location = new Point(5, 1);
-            lblBus1.Size = new Size(50, 20);
-            pnlBus1.Controls.Add(lblBus1);
+            lblBUS1.Text = "BUS1";
+            lblBUS1.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, ((byte)(0)));
+            lblBUS1.TextAlign = ContentAlignment.MiddleCenter;
+            lblBUS1.Location = new Point(5, 1);
+            lblBUS1.Size = new Size(50, 20);
+            pnlBUS1.Controls.Add(lblBUS1);
 
-            pnlBus1.ResumeLayout();
-            pnlBus1.PerformLayout();
+            pnlBUS1.ResumeLayout();
+            pnlBUS1.PerformLayout();
             //--------------------------------------------
 
-            //ACC register
+            //Accumulator register
             //--------------------------------------------
-            pnlAcc.SuspendLayout();
+            pnlAccumulator.SuspendLayout();
 
-            pnlAcc.BorderStyle = BorderStyle.FixedSingle;
-            pnlAcc.Location = new Point(50, 395);
-            pnlAcc.Size = new Size(80, 50);
-            Controls.Add(pnlAcc);
+            pnlAccumulator.BorderStyle = BorderStyle.FixedSingle;
+            pnlAccumulator.Location = new Point(50, 395);
+            pnlAccumulator.Size = new Size(80, 50);
+            Controls.Add(pnlAccumulator);
 
-            lblAcc.Text = "ACC";
-            lblAcc.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, ((byte)(0)));
-            lblAcc.TextAlign = ContentAlignment.MiddleCenter;
-            lblAcc.Location = new Point(22, 4);
-            lblAcc.Size = new Size(40, 20);
-            pnlAcc.Controls.Add(lblAcc);
+            lblAccumulator.Text = "ACC";
+            lblAccumulator.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, ((byte)(0)));
+            lblAccumulator.TextAlign = ContentAlignment.MiddleCenter;
+            lblAccumulator.Location = new Point(22, 4);
+            lblAccumulator.Size = new Size(40, 20);
+            pnlAccumulator.Controls.Add(lblAccumulator);
 
-            lblAccContents.Text = "00000000";
-            lblAccContents.TextAlign = ContentAlignment.MiddleCenter;
-            lblAccContents.BorderStyle = BorderStyle.FixedSingle;
-            lblAccContents.Location = new Point(10, 26);
-            lblAccContents.Size = new Size(60, 20);
-            pnlAcc.Controls.Add(lblAccContents);
+            lblAccumulatorContents.Text = "00000000";
+            lblAccumulatorContents.TextAlign = ContentAlignment.MiddleCenter;
+            lblAccumulatorContents.BorderStyle = BorderStyle.FixedSingle;
+            lblAccumulatorContents.Location = new Point(10, 26);
+            lblAccumulatorContents.Size = new Size(60, 20);
+            pnlAccumulator.Controls.Add(lblAccumulatorContents);
 
-            pnlAcc.ResumeLayout();
-            pnlAcc.PerformLayout();
+            pnlAccumulator.ResumeLayout();
+            pnlAccumulator.PerformLayout();
             //--------------------------------------------
 
             //IAR register
             //--------------------------------------------
-            pnlIar.SuspendLayout();
+            pnlIAR.SuspendLayout();
 
-            pnlIar.BorderStyle = BorderStyle.FixedSingle;
-            pnlIar.Location = new Point(350, 395);
-            pnlIar.Size = new Size(80, 50);
-            Controls.Add(pnlIar);
+            pnlIAR.BorderStyle = BorderStyle.FixedSingle;
+            pnlIAR.Location = new Point(350, 395);
+            pnlIAR.Size = new Size(80, 50);
+            Controls.Add(pnlIAR);
 
-            lblIar.Text = "IAR";
-            lblIar.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, ((byte)(0)));
-            lblIar.TextAlign = ContentAlignment.MiddleCenter;
-            lblIar.Location = new Point(22, 4);
-            lblIar.Size = new Size(40, 20);
-            pnlIar.Controls.Add(lblIar);
+            lblIAR.Text = "IAR";
+            lblIAR.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, ((byte)(0)));
+            lblIAR.TextAlign = ContentAlignment.MiddleCenter;
+            lblIAR.Location = new Point(22, 4);
+            lblIAR.Size = new Size(40, 20);
+            pnlIAR.Controls.Add(lblIAR);
 
-            lblIarContents.Text = "00000000";
-            lblIarContents.TextAlign = ContentAlignment.MiddleCenter;
-            lblIarContents.BorderStyle = BorderStyle.FixedSingle;
-            lblIarContents.Location = new Point(10, 26);
-            lblIarContents.Size = new Size(60, 20);
-            pnlIar.Controls.Add(lblIarContents);
+            lblIARContents.Text = "00000000";
+            lblIARContents.TextAlign = ContentAlignment.MiddleCenter;
+            lblIARContents.BorderStyle = BorderStyle.FixedSingle;
+            lblIARContents.Location = new Point(10, 26);
+            lblIARContents.Size = new Size(60, 20);
+            pnlIAR.Controls.Add(lblIARContents);
 
-            pnlIar.ResumeLayout();
-            pnlIar.PerformLayout();
+            pnlIAR.ResumeLayout();
+            pnlIAR.PerformLayout();
             //--------------------------------------------
 
             //IR register
             //--------------------------------------------
-            pnlIr.SuspendLayout();
+            pnlIR.SuspendLayout();
 
-            pnlIr.BorderStyle = BorderStyle.FixedSingle;
-            pnlIr.Location = new Point(470, 395);
-            pnlIr.Size = new Size(80, 50);
-            Controls.Add(pnlIr);
+            pnlIR.BorderStyle = BorderStyle.FixedSingle;
+            pnlIR.Location = new Point(470, 395);
+            pnlIR.Size = new Size(80, 50);
+            Controls.Add(pnlIR);
 
-            lblIr.Text = "IR";
-            lblIr.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, ((byte)(0)));
-            lblIr.TextAlign = ContentAlignment.MiddleCenter;
-            lblIr.Location = new Point(22, 4);
-            lblIr.Size = new Size(40, 20);
-            pnlIr.Controls.Add(lblIr);
+            lblIR.Text = "IR";
+            lblIR.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, ((byte)(0)));
+            lblIR.TextAlign = ContentAlignment.MiddleCenter;
+            lblIR.Location = new Point(22, 4);
+            lblIR.Size = new Size(40, 20);
+            pnlIR.Controls.Add(lblIR);
 
-            lblIrContents.Text = "00000000";
-            lblIrContents.TextAlign = ContentAlignment.MiddleCenter;
-            lblIrContents.BorderStyle = BorderStyle.FixedSingle;
-            lblIrContents.Location = new Point(10, 26);
-            lblIrContents.Size = new Size(60, 20);
-            pnlIr.Controls.Add(lblIrContents);
+            lblIRContents.Text = "00000000";
+            lblIRContents.TextAlign = ContentAlignment.MiddleCenter;
+            lblIRContents.BorderStyle = BorderStyle.FixedSingle;
+            lblIRContents.Location = new Point(10, 26);
+            lblIRContents.Size = new Size(60, 20);
+            pnlIR.Controls.Add(lblIRContents);
 
-            pnlIr.ResumeLayout();
-            pnlIr.PerformLayout();
+            pnlIR.ResumeLayout();
+            pnlIR.PerformLayout();
             //--------------------------------------------
 
             //MAR register
             //--------------------------------------------
-            pnlMar.SuspendLayout();
+            pnlMAR.SuspendLayout();
 
-            pnlMar.BorderStyle = BorderStyle.FixedSingle;
-            pnlMar.Location = new Point(415, 10);
-            pnlMar.Size = new Size(80, 50);
-            Controls.Add(pnlMar);
+            pnlMAR.BorderStyle = BorderStyle.FixedSingle;
+            pnlMAR.Location = new Point(415, 10);
+            pnlMAR.Size = new Size(80, 50);
+            Controls.Add(pnlMAR);
 
-            lblMar.Text = "MAR";
-            lblMar.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, ((byte)(0)));
-            lblMar.TextAlign = ContentAlignment.MiddleCenter;
-            lblMar.Location = new Point(20, 4);
-            lblMar.Size = new Size(41, 20);
-            pnlMar.Controls.Add(lblMar);
+            lblMAR.Text = "MAR";
+            lblMAR.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, ((byte)(0)));
+            lblMAR.TextAlign = ContentAlignment.MiddleCenter;
+            lblMAR.Location = new Point(20, 4);
+            lblMAR.Size = new Size(41, 20);
+            pnlMAR.Controls.Add(lblMAR);
 
-            lblMarContents.Text = "00000000";
-            lblMarContents.TextAlign = ContentAlignment.MiddleCenter;
-            lblMarContents.BorderStyle = BorderStyle.FixedSingle;
-            lblMarContents.Location = new Point(10, 26);
-            lblMarContents.Size = new Size(60, 20);
-            pnlMar.Controls.Add(lblMarContents);
+            lblMARContents.Text = "00000000";
+            lblMARContents.TextAlign = ContentAlignment.MiddleCenter;
+            lblMARContents.BorderStyle = BorderStyle.FixedSingle;
+            lblMARContents.Location = new Point(10, 26);
+            lblMARContents.Size = new Size(60, 20);
+            pnlMAR.Controls.Add(lblMARContents);
 
-            pnlMar.ResumeLayout();
-            pnlMar.PerformLayout();
+            pnlMAR.ResumeLayout();
+            pnlMAR.PerformLayout();
             //--------------------------------------------
 
             for (int count = 0; count < Globals.NO_OF_GPR; count++)
@@ -354,10 +360,18 @@ namespace CPU_Simulator
         {
             if (Globals.clockspeed != 1)
             {
-                if (Globals.clockspeed == 500) Globals.clockspeed -= 499;
-                else Globals.clockspeed -= 500;
+                if (Globals.clockspeed == 500)
+                {
+                    Globals.clockspeed -= 499;
+                    lblClock.Text = "Real-time";
+                }
 
-                lblClock.Text = Globals.clockspeed.ToString();
+                else
+                {
+                    Globals.clockspeed -= 500;
+                    lblClock.Text = Globals.clockspeed.ToString();
+                }
+
                 timer.Interval = Globals.clockspeed;
             }
         }
@@ -373,7 +387,7 @@ namespace CPU_Simulator
 
         private void btnStart_Click(object sender, EventArgs e)
         {
-            Thread CPUThread = new Thread(new ThreadStart(m_CU.start));
+            Thread CPUThread = new Thread(new ThreadStart(CU.start));
             CPUThread.Start();
         }
 
@@ -545,12 +559,12 @@ namespace CPU_Simulator
         {
             SuspendLayout();
 
-            lblTmpContents.ForeColor = Color.Black;
-            lblAccContents.ForeColor = Color.Black;
-            lblIarContents.ForeColor = Color.Black;
-            lblIrContents.ForeColor = Color.Black;
-            lblMarContents.ForeColor = Color.Black;
+            lblIRContents.ForeColor = Color.Black;
+            lblIARContents.ForeColor = Color.Black;
+            lblMARContents.ForeColor = Color.Black;
             lblRAMContents.ForeColor = Color.Black;
+            lblTMPContents.ForeColor = Color.Black;
+            lblAccumulatorContents.ForeColor = Color.Black;
 
             for (int count = 0; count < Globals.NO_OF_GPR; count++)
             {
@@ -561,59 +575,61 @@ namespace CPU_Simulator
             drawBus();
         }
 
-        public void updateIAR(BitArray data)
+        //CPU state changes
+        //-------------------------------------
+        public void updateIARContents(BitArray data)
         {
-            if (InvokeRequired) Invoke(new UpdateRegisterContents(updateIAR), new object[] { data });
+            if (InvokeRequired) Invoke(new SetRegister(updateIARContents), new object[] { data });
             else
             {
-                lblIarContents.Text = Globals.convertBitsToString(data);
-                lblIarContents.ForeColor = Color.Red;
+                lblIARContents.Text = Globals.convertBitsToString(data);
+                lblIARContents.ForeColor = Color.Red;
             }
         }
 
-        public void updateIR(BitArray data)
+        public void updateIRContents(BitArray data)
         {
-            if (InvokeRequired) Invoke(new UpdateRegisterContents(updateIR), new object[] { data });
+            if (InvokeRequired) Invoke(new SetRegister(updateIRContents), new object[] { data });
             else
             {
-                lblIrContents.Text = Globals.convertBitsToString(data);
-                lblIrContents.ForeColor = Color.Red;
+                lblIRContents.Text = Globals.convertBitsToString(data);
+                lblIRContents.ForeColor = Color.Red;
             }
         }
 
-        public void updateMAR(BitArray data)
+        public void updateMARContents(BitArray data)
         {
-            if (InvokeRequired) Invoke(new UpdateRegisterContents(updateMAR), new object[] { data });
+            if (InvokeRequired) Invoke(new SetRegister(updateMARContents), new object[] { data });
             else
             {
-                lblMarContents.Text = Globals.convertBitsToString(data);
-                lblMarContents.ForeColor = Color.Red;
+                lblMARContents.Text = Globals.convertBitsToString(data);
+                lblMARContents.ForeColor = Color.Red;
             }
         }
 
-        public void updateTMP(BitArray data)
+        public void updateTMPContents(BitArray data)
         {
-            if (InvokeRequired) Invoke(new UpdateRegisterContents(updateTMP), new object[] { data });
+            if (InvokeRequired) Invoke(new SetRegister(updateTMPContents), new object[] { data });
             else
             {
-                lblTmpContents.Text = Globals.convertBitsToString(data);
-                lblTmpContents.ForeColor = Color.Red;
+                lblTMPContents.Text = Globals.convertBitsToString(data);
+                lblTMPContents.ForeColor = Color.Red;
             }
         }
 
-        public void updateAcc(BitArray data)
+        public void updateAccumulatorContents(BitArray data)
         {
-            if (InvokeRequired) Invoke(new UpdateRegisterContents(updateAcc), new object[] { data });
+            if (InvokeRequired) Invoke(new SetRegister(updateAccumulatorContents), new object[] { data });
             else
             {
-                lblAccContents.Text = Globals.convertBitsToString(data);
-                lblAccContents.ForeColor = Color.Red;
+                lblAccumulatorContents.Text = Globals.convertBitsToString(data);
+                lblAccumulatorContents.ForeColor = Color.Red;
             }
         }
 
-        public void readRAM(BitArray data, int address)
+        public void readRAMLocation(BitArray data, int address)
         {
-            if (InvokeRequired) Invoke(new UpdateGPRContents(readRAM), new object[] { data, address });
+            if (InvokeRequired) Invoke(new SetEnableGPR(readRAMLocation), new object[] { data, address });
             else
             {
                 lblRAMContents.Text = Globals.convertBitsToString(data);
@@ -622,9 +638,9 @@ namespace CPU_Simulator
             }
         }
 
-        public void setRAM(BitArray data, int address)
+        public void overwriteRAMLocation(BitArray data, int address)
         {
-            if (InvokeRequired) Invoke(new UpdateGPRContents(setRAM), new object[] { data, address });
+            if (InvokeRequired) Invoke(new SetEnableGPR(overwriteRAMLocation), new object[] { data, address });
             else
             {
                 lblRAMContents.Text = Globals.convertBitsToString(data);
@@ -633,9 +649,9 @@ namespace CPU_Simulator
             }
         }
 
-        public void updateGPR(BitArray data, int GPRindex)
+        public void updateGPRContents(BitArray data, int GPRindex)
         {
-            if (InvokeRequired) Invoke(new UpdateGPRContents(updateGPR), new object[] { data, GPRindex });
+            if (InvokeRequired) Invoke(new SetEnableGPR(updateGPRContents), new object[] { data, GPRindex });
             else
             {
                 if (GPRindex < Globals.NO_OF_GPR)
@@ -648,7 +664,7 @@ namespace CPU_Simulator
 
         public void enableBus()
         {
-            if (InvokeRequired) Invoke(new EnableBus(enableBus));
+            if (InvokeRequired) Invoke(new EnableRegister(enableBus));
             else
             {
                 Graphics g = CreateGraphics();
@@ -731,6 +747,7 @@ namespace CPU_Simulator
                 //----------------------------------------
             }
         }
+        //-------------------------------------
     }
 
     public static class Globals
@@ -778,156 +795,182 @@ namespace CPU_Simulator
 
     public class Register
     {
-        public event EnableBus EnableRegister;
+        public event EnableRegister OutputToBus;
+        public event SetRegister OverwriteContents;
 
         private BitArray contents = new BitArray(Globals.BYTE_LENGTH);
 
-        public Register(EnableBus eventhandler) { EnableRegister += eventhandler; }
-        public void set(BitArray contents) { this.contents = contents; }
-        public BitArray enable()
+        //used by GPRs and RAM, they are set with an index so GUI can show address/select correct GPU
+        public Register(EnableRegister outputToBus) { OutputToBus += outputToBus; }
+
+        //used by SPRs
+        public Register(EnableRegister outputToBus, SetRegister overwriteContents)
         {
-            EnableRegister?.Invoke();
+            OutputToBus += outputToBus;
+            OverwriteContents += overwriteContents;
+        }
+
+        //write data to the register
+        public void overwriteContents(BitArray contents)
+        {
+            OverwriteContents?.Invoke(contents);
+            Thread.Sleep(Globals.clockspeed);
+            this.contents = contents;
+        }
+
+        //read data stored in the register
+        public BitArray readContents()
+        {
+            OutputToBus?.Invoke();
+            Thread.Sleep(Globals.clockspeed);
             return contents;
         }
     }
 
     public class RAM
     {
-        public event UpdateGPRContents SetRAM;
-        public event UpdateGPRContents GetRAM;
+        public event SetEnableGPR ReadLocation;
+        public event SetEnableGPR OverwriteLocation;
 
-        private Register[] m_locations = new Register[Globals.RAM_SIZE];
+        private Register[] locations = new Register[Globals.RAM_SIZE];
 
-        public RAM(BitArray[] instructions, EnableBus eventhandler)
+        public RAM(BitArray[] instructions, EnableRegister outputToBus, SetEnableGPR readLocation, SetEnableGPR overwriteLocation)
         {
+            ReadLocation  += readLocation;
+            OverwriteLocation += overwriteLocation;
+
             //fill RAM with instructions
             for (int count = 0; count < instructions.Length; count++)
             {
-                m_locations[count] = new Register(eventhandler);
-                m_locations[count].set(instructions[count]);
+                locations[count] = new Register(outputToBus);
+                locations[count].overwriteContents(instructions[count]);
             }
 
-            //fill RAM with empty registers
+            //fill remaining RAM with empty registers
             for (int count = instructions.Length; count < Globals.RAM_SIZE; count++)
-                m_locations[count] = new Register(eventhandler);
-        }
-
-        public void writeToLocation(BitArray address, BitArray data)
-        {
-            //get dec value of address
-            byte[] addr = new byte[1];
-            address.CopyTo(addr, 0);
-
-            //access address and put the data
-            m_locations[addr[0]].set(data);
-
-            SetRAM?.Invoke(data, addr[0]);
+                locations[count] = new Register(outputToBus);
         }
 
         public BitArray readFromLocation(BitArray address)
         {
-            //get dec value of address
+            //convert binary address to decimal, used to index RAM
             byte[] addr = new byte[1];
             address.CopyTo(addr, 0);
 
-            GetRAM?.Invoke(m_locations[addr[0]].enable(), addr[0]);
-            
             //access address and get the data
-            return m_locations[addr[0]].enable();
+            ReadLocation?.Invoke(locations[addr[0]].readContents(), addr[0]);
+            Thread.Sleep(Globals.clockspeed);
+            return locations[addr[0]].readContents();
+        }
+
+        public void writeToLocation(BitArray address, BitArray data)
+        {
+            //convert binary address to decimal, used to index RAM
+            byte[] addr = new byte[1];
+            address.CopyTo(addr, 0);
+
+            //access address and put the data
+            OverwriteLocation?.Invoke(data, addr[0]);
+            Thread.Sleep(Globals.clockspeed);
+            locations[addr[0]].overwriteContents(data);
         }
     }
 
     public class MAR : Register
     {
-        private RAM m_RAM;
+        private RAM RAM;
 
-        public MAR(BitArray[] instructions, UpdateGPRContents setram, UpdateGPRContents getram, 
-            EnableBus enablebus) : base(enablebus)
-        {
-            m_RAM = new RAM(instructions, enablebus);
-            m_RAM.SetRAM += setram;
-            m_RAM.GetRAM += getram;
-        }
+        public MAR(BitArray[] instructions, SetEnableGPR readFromRAM, SetEnableGPR writeToRAM,                  //RAM parameters
+            EnableRegister outputToBus, SetRegister overwriteContents) : base(outputToBus, overwriteContents)   //MAR parameters
+        { RAM = new RAM(instructions, outputToBus, readFromRAM, writeToRAM); }
 
-        public void writeToMemory(BitArray data) { m_RAM.writeToLocation(enable(), data); }
-        public BitArray readFromMemory() { return m_RAM.readFromLocation(enable()); }
+        //pass address in MAR to RAM to access location and read or write to it
+        public void writeToMemory(BitArray data) { RAM.writeToLocation(this.readContents(), data); }
+        public BitArray readFromMemory() { return RAM.readFromLocation(this.readContents()); }
     } 
 
     public class ALU
     {
-        public event UpdateRegisterContents UpdateACC;
-
         public static class Flags { public const int COUT = 3, EQUAL = 2, A_LARGER = 1, ZERO = 0; }
 
         //change to private (find workaround)
         public bool bus1 = false;
-        public bool[] m_flags = new bool[Globals.NO_OF_FLAGS];
-        public Register m_temp, m_accumulator;
 
-        public ALU(EnableBus eventhandler)
+        //flag register and SPRs used by ALU
+        public bool[] flags = new bool[Globals.NO_OF_FLAGS];
+        public Register TMP, accumulator;
+
+        public ALU(EnableRegister outputToBus, SetRegister overwriteTMP, SetRegister overwriteAccumulator)
         {
-            m_temp = new Register(eventhandler);
-            m_accumulator = new Register(eventhandler);
+            TMP = new Register(outputToBus, overwriteTMP);
+            accumulator = new Register(outputToBus, overwriteAccumulator);
 
             //set flags to false
             for (int count = 0; count < Globals.NO_OF_FLAGS; count++)
-                m_flags[count] = false;
+                flags[count] = false;
         }
 
-        public void readOpcode(BitArray opcode, BitArray a)
+        //decode instruction to execute
+        public void readOpcode(BitArray opcode, BitArray primaryInput)
         {
-            BitArray result = new BitArray(Globals.BYTE_LENGTH);
-            string binary = Globals.convertBitsToString(opcode);
+            string opcodeAsString = Globals.convertBitsToString(opcode);
 
-            switch (binary)
+            switch (opcodeAsString)
             {
+                //ADD
                 case "1000":
-                    m_accumulator.set(add(a));
+                    accumulator.overwriteContents(add(primaryInput));
                     break;
 
+                //RSHIFT
                 case "1001":
-                    m_accumulator.set(shiftRight(a));
+                    accumulator.overwriteContents(shiftRight(primaryInput));
                     break;
 
+                //LSHIFT
                 case "1010":
-                    m_accumulator.set(shiftLeft(a));
+                    accumulator.overwriteContents(shiftLeft(primaryInput));
                     break;
 
+                //NOT
                 case "1011":
-                    m_accumulator.set(inverse(a));
+                    accumulator.overwriteContents(inverse(primaryInput));
                     break;
-
+                
+                //AND
                 case "1100":
-                    m_accumulator.set(and(a));
+                    accumulator.overwriteContents(and(primaryInput));
                     break;
-
+                
+                //OR
                 case "1101":
-                    m_accumulator.set(or(a));
+                    accumulator.overwriteContents(or(primaryInput));
                     break;
-
+                
+                //XOR
                 case "1110":
-                    m_accumulator.set(xor(a));
+                    accumulator.overwriteContents(xor(primaryInput));
                     break;
-
+                
+                //compare
                 case "1111":
-                    compare(a);
+                    compare(primaryInput);
                     break;
 
+                //invalid opcode
                 default:
                     MessageBox.Show("Invalid opcode");
                     break;
             }
-
-            UpdateACC?.Invoke(m_accumulator.enable());
-            Thread.Sleep(Globals.clockspeed);
         }
 
-        private BitArray add(BitArray input_a)
+        private BitArray add(BitArray firstNumber)
         {
-            BitArray input_b, result = new BitArray(Globals.BYTE_LENGTH);
+            BitArray secondNumber, result = new BitArray(Globals.BYTE_LENGTH);
 
-            if (bus1) input_b = new BitArray(new byte[] { 1 });
-            else input_b = new BitArray(m_temp.enable());
+            //examine if request was an increment or add 2 values
+            if (bus1) secondNumber = new BitArray(new byte[] { 1 });
+            else secondNumber = new BitArray(TMP.readContents());
 
             //examine each bit of both values and add them together
             bool carrybit = false;
@@ -936,14 +979,14 @@ namespace CPU_Simulator
                 if (carrybit)
                 {
                     //0+0+1 = 1 no carry
-                    if (input_a[count] == false && input_b[count] == false)
+                    if (firstNumber[count] == false && secondNumber[count] == false)
                     {
                         result[count] = true;
                         carrybit = false;
                     }
 
                     //1+1+1 = 1 c1
-                    else if (input_a[count] == true && input_b[count] == true)
+                    else if (firstNumber[count] == true && secondNumber[count] == true)
                         result[count] = true;
 
                     //1+0+1 = 0 c1
@@ -953,11 +996,11 @@ namespace CPU_Simulator
                 else
                 {
                     //0+0 = 0 no carry
-                    if (input_a[count] == false && input_b[count] == false)
+                    if (firstNumber[count] == false && secondNumber[count] == false)
                         result[count] = false;
 
                     //1+1 = 0 c1
-                    else if (input_a[count] == true && input_b[count] == true)
+                    else if (firstNumber[count] == true && secondNumber[count] == true)
                     {
                         result[count] = false;
                         carrybit = true;
@@ -971,45 +1014,45 @@ namespace CPU_Simulator
             return result;
         }
 
-        private BitArray shiftRight(BitArray a)
+        private BitArray shiftRight(BitArray data)
         {
             BitArray result = new BitArray(Globals.BYTE_LENGTH);
 
             //if rightmost bit on its shifted out, enable COUT flag
-            if (a[0]) m_flags[Flags.COUT] = true;
+            if (data[0]) flags[Flags.COUT] = true;
 
             //look ahead to next bit of a and copy into current bit of result
             for (int front = 1, back = 0; front < Globals.BYTE_LENGTH; front++, back++)
-                result[back] = a[front];
+                result[back] = data[front];
 
             return result;
         }
 
-        private BitArray shiftLeft(BitArray a)
+        private BitArray shiftLeft(BitArray data)
         {
             BitArray result = new BitArray(Globals.BYTE_LENGTH);
 
             //if leftmost bit on its shifted out, enable COUT flag
-            if (a[Globals.BYTE_LAST]) m_flags[Flags.COUT] = true;
+            if (data[Globals.BYTE_LAST]) flags[Flags.COUT] = true;
 
             //copy current bit of a into next bit of result
             for (int front = 1, back = 0; front < Globals.BYTE_LENGTH; front++, back++)
-                result[front] = a[back];
+                result[front] = data[back];
 
             return result;
         }
 
-        private BitArray inverse(BitArray a) { return a.Not(); }
+        private BitArray inverse(BitArray data) { return data.Not(); }
 
-        private BitArray and(BitArray a) { return a.And(m_temp.enable()); }
+        private BitArray and(BitArray data) { return data.And(TMP.readContents()); }
 
-        private BitArray or(BitArray a) { return a.Or(m_temp.enable()); }
+        private BitArray or(BitArray data) { return data.Or(TMP.readContents()); }
 
-        private BitArray xor(BitArray a) { return a.Xor(m_temp.enable()); }
+        private BitArray xor(BitArray data) { return data.Xor(TMP.readContents()); }
 
-        private void compare(BitArray a)
+        private void compare(BitArray firstNumber)
         {
-            BitArray b = new BitArray(m_temp.enable());
+            BitArray secondNumber = new BitArray(TMP.readContents());
             bool isequal = true, iszero = true;
 
             //count from MSB downward, first unequal bits breaks loop
@@ -1017,70 +1060,85 @@ namespace CPU_Simulator
             while (isequal && count >= 0)
             {
                 //check if bit a is true and b is false
-                if (a[count] && !b[count])
+                if (firstNumber[count] && !secondNumber[count])
                 {
                     isequal = false;
                     iszero = false;
-                    m_flags[Flags.A_LARGER] = true;
+                    flags[Flags.A_LARGER] = true;
                 }
 
                 //check if bit a is false and b is true
-                else if (!a[count] && b[count])
+                else if (!firstNumber[count] && secondNumber[count])
                 {
                     isequal = false;
                     iszero = false;
                 }
 
                 //check if both bits not false
-                else if (a[count] && b[count])
+                else if (firstNumber[count] && secondNumber[count])
                     iszero = false;
 
                 count--;
             }
 
-            if (isequal) m_flags[Flags.EQUAL] = true;
-            if (iszero)  m_flags[Flags.ZERO] = true;
+            if (isequal) flags[Flags.EQUAL] = true;
+            if (iszero)  flags[Flags.ZERO] = true;
         }
     }
 
     public class ControlUnit
     {
-        public event UpdateRegisterContents UpdateIAR;
-        public event UpdateRegisterContents UpdateIR;
-        public event UpdateRegisterContents UpdateMAR;
-        public event UpdateRegisterContents UpdateTMP;
-        public event UpdateGPRContents UpdateGPRs;
+        public event SetEnableGPR WriteToGPR;
 
-        public readonly BitArray lastaddress = new BitArray(Globals.BYTE_LENGTH);
+        //tracks the address of the last instruction to execute
+        public readonly BitArray lastAddress = new BitArray(Globals.BYTE_LENGTH);
 
-        private byte m_rega, m_regb;
-        private bool programend = false;
+        private bool programEnd = false;    //condition to stop execution
+        private byte registerA, registerB;  //temporary storage for register addresses in use
 
-        private ALU m_ALU;
-        private MAR m_MAR;
-        private Register m_IAR, m_IR;
-        private Register[] m_GPR = new Register[Globals.NO_OF_GPR];
+        //components and registers
+        private ALU ALU;
+        private MAR MAR;
+        private Register IAR, IR;
+        private Register[] GPR = new Register[Globals.NO_OF_GPR];
 
-        public ControlUnit(BitArray[] instructions, UpdateGPRContents setram, UpdateGPRContents getram, 
-            UpdateRegisterContents ACCevent, EnableBus enablebus)
+        public ControlUnit(BitArray[] instructions, SetEnableGPR readFromRAM, SetEnableGPR writeToRAM, 
+            EnableRegister outputToBus, SetRegister overwriteIAR, SetRegister overwriteIR, SetRegister overwriteMAR, 
+            SetRegister overwriteTMP, SetRegister overwriteAccumulator)
         {
-            m_ALU = new ALU(enablebus);
-            m_ALU.UpdateACC += ACCevent;
+            //intialising each component and register and linking GUI events to them
+            ALU = new ALU(outputToBus, overwriteTMP, overwriteAccumulator);
+            MAR = new MAR(instructions, readFromRAM, writeToRAM, outputToBus, overwriteMAR);
+            IAR = new Register(outputToBus, overwriteIAR);
+            IR = new Register(outputToBus, overwriteIR);
 
-            m_MAR = new MAR(instructions, setram, getram, enablebus);
-            m_IAR = new Register(enablebus);
-            m_IR = new Register(enablebus);
-
-            lastaddress = new BitArray(new byte[] { (byte)(instructions.Length - 1) });
+            lastAddress = new BitArray(new byte[] { (byte)(instructions.Length - 1) });
 
             //initialise GPRs
             for (int count = 0; count < Globals.NO_OF_GPR; count++)
-                m_GPR[count] = new Register(enablebus);
+                GPR[count] = new Register(outputToBus);
         }
 
         public void start()
         {
-            while (!programend)
+            //restart program if start clicked again
+            if (programEnd)
+            {
+                programEnd = false;
+
+                //reset values of registers
+                MAR.overwriteContents(new BitArray(new byte[] { 0 }));
+                IAR.overwriteContents(new BitArray(new byte[] { 0 }));
+                IR.overwriteContents(new BitArray(new byte[] { 0 }));
+
+                ALU.accumulator.overwriteContents(new BitArray(new byte[] { 0 }));
+                ALU.TMP.overwriteContents(new BitArray(new byte[] { 0 }));
+
+                for (int count = 0; count < Globals.NO_OF_GPR; count++)
+                    GPR[count].overwriteContents(new BitArray(new byte[] { 0 }));
+            }
+
+            while (!programEnd)
             {
                 fetchInstruction();
                 executeInstruction();
@@ -1096,88 +1154,75 @@ namespace CPU_Simulator
             setInstructionRegister();
         }
 
-        public void executeInstruction()
-        {
-            readInstructionRegister();
-        }
+        public void executeInstruction() { readInstructionRegister(); }
 
-        private void accessMemory()
-        {
-            m_MAR.set(m_IAR.enable());
-            UpdateMAR?.Invoke(m_MAR.enable());
-            Thread.Sleep(Globals.clockspeed);
-        }
+        private void accessMemory() { MAR.overwriteContents(IAR.readContents()); }
 
         private void incrementIAR()
         {
-            if (Globals.areBitsEqual(m_IAR.enable(), lastaddress)) programend = true;
+            if (Globals.areBitsEqual(IAR.readContents(), lastAddress)) programEnd = true;
 
             //enable bus1 register
-            m_ALU.bus1 = true;
+            ALU.bus1 = true;
 
             //create opcode for ADD
             BitArray opcode = new BitArray(Globals.OPCODE_LENGTH);
             opcode.Set(Globals.OPCODE_LAST, true);
 
             //method will add bus1 and the IAR
-            m_ALU.readOpcode(opcode, m_IAR.enable());
+            ALU.readOpcode(opcode, IAR.readContents());
 
             //turn off bus1
-            m_ALU.bus1 = false;
+            ALU.bus1 = false;
 
             //set new value of IAR
-            m_IAR.set(m_ALU.m_accumulator.enable());
-            UpdateIAR?.Invoke(m_IAR.enable());
-            Thread.Sleep(Globals.clockspeed);
+            IAR.overwriteContents(ALU.accumulator.readContents());
         }
 
-        private void setInstructionRegister()
-        {
-            m_IR.set(m_MAR.readFromMemory());
-            UpdateIR?.Invoke(m_IR.enable());
-            Thread.Sleep(Globals.clockspeed);
-        }
+        private void setInstructionRegister() { IR.overwriteContents(MAR.readFromMemory()); }
 
         private void readInstructionRegister()
         {
             BitArray opcode = new BitArray(Globals.OPCODE_LENGTH),
-                register_a = new BitArray(Globals.REGISTER_CODE_LENGTH), 
-                register_b = new BitArray(Globals.REGISTER_CODE_LENGTH);
+                registerA = new BitArray(Globals.REGISTER_CODE_LENGTH), 
+                registerB = new BitArray(Globals.REGISTER_CODE_LENGTH);
 
             //copy opcode bits from IR
             for (int count = Globals.OPCODE_LENGTH, opindex = 0; count < Globals.BYTE_LENGTH; count++, opindex++)
-                opcode[opindex] = m_IR.enable()[count];
+                opcode[opindex] = IR.readContents()[count];
 
-            //deduce the register codes for reg a and b from IR
-            for (int count = 0, reg_a_index = Globals.REGISTER_CODE_LENGTH; 
-                count < Globals.REGISTER_CODE_LENGTH; count++, reg_a_index++)
+            //deduce the register addresses from IR
+            for (int registerBIndex = 0, registerAIndex = Globals.REGISTER_CODE_LENGTH;     //B is at the start of the code, A is at the index after the end of B
+                registerBIndex < Globals.REGISTER_CODE_LENGTH; 
+                registerBIndex++, registerAIndex++)
             {
-                register_a[count] = m_IR.enable()[reg_a_index];
-                register_b[count] = m_IR.enable()[count];
+                registerA[registerBIndex] = IR.readContents()[registerAIndex];
+                registerB[registerBIndex] = IR.readContents()[registerBIndex];
             }
 
-            //copy the register codes back to a decimal value
-            byte[] rega = new byte[1], regb = new byte[1];
-            register_a.CopyTo(rega, 0);
-            register_b.CopyTo(regb, 0);
+            //copy the register addresses back to a decimal value
+            byte[] registerADecimal = new byte[1], registerBDecimal = new byte[1];
+            registerA.CopyTo(registerADecimal, 0);
+            registerB.CopyTo(registerBDecimal, 0);
 
             //note the selected registers for later
-            m_rega = rega[0];
-            m_regb = regb[0];
+            this.registerA = registerADecimal[0];
+            this.registerB = registerBDecimal[0];
 
             //opcode leftmost bit is ALU bit
             if (opcode[3])
             {
                 //should only set TMP if 2 input operation (needs workaround)
-                
-                //put contents of b in TMP, read and perform instruction, store answer in regb
-                m_ALU.m_temp.set(m_GPR[m_regb].enable());
-                UpdateTMP?.Invoke(m_ALU.m_temp.enable());
-                Thread.Sleep(Globals.clockspeed);
 
-                m_ALU.readOpcode(opcode, m_GPR[m_rega].enable());
-                m_GPR[m_regb].set(m_ALU.m_accumulator.enable());
-                UpdateGPRs?.Invoke(m_GPR[m_regb].enable(), m_regb);
+                //put contents of b in TMP, read and perform instruction, store answer in regb
+                ALU.TMP.overwriteContents(GPR[this.registerB].readContents());
+
+                //run the ALU instruction
+                ALU.readOpcode(opcode, GPR[this.registerA].readContents());
+
+                //SHOULD ONLY SET REG B IF NOT COMPARISON (NEEDS FIX)
+                GPR[this.registerB].overwriteContents(ALU.accumulator.readContents());
+                WriteToGPR?.Invoke(GPR[this.registerB].readContents(), this.registerB);
                 Thread.Sleep(Globals.clockspeed);
             }
 
@@ -1210,8 +1255,8 @@ namespace CPU_Simulator
                     case "0101":
                         //combine reg a and b codes as they correspond to flags
                         bool[] cat = new bool[Globals.NO_OF_FLAGS];
-                        register_a.CopyTo(cat, Globals.REGISTER_CODE_LENGTH);
-                        register_b.CopyTo(cat, 0);
+                        registerA.CopyTo(cat, Globals.REGISTER_CODE_LENGTH);
+                        registerB.CopyTo(cat, 0);
 
                         BitArray condition = new BitArray(cat);
                         jumpIf(condition);
@@ -1228,61 +1273,54 @@ namespace CPU_Simulator
             }
         }
 
+        //copy data from RAM to register (address specified)
         private void load()
         {
-            //reg a selects address of data to load into reg b
-            m_MAR.set(m_GPR[m_rega].enable());
-            UpdateMAR?.Invoke(m_MAR.enable());
-            Thread.Sleep(Globals.clockspeed);
+            //load address in register A to MAR
+            MAR.overwriteContents(GPR[registerA].readContents());
 
-            m_GPR[m_regb].set(m_MAR.readFromMemory());
-            UpdateGPRs?.Invoke(m_GPR[m_regb].enable(), m_regb);
+            //save the data in RAM to register B
+            GPR[registerB].overwriteContents(MAR.readFromMemory());
+            WriteToGPR?.Invoke(GPR[registerB].readContents(), registerB);
             Thread.Sleep(Globals.clockspeed);
         }
 
+        //copy data from register to RAM
         private void store()
         {
-            //reg a selects address to store contents of reg b
-            m_MAR.set(m_GPR[m_rega].enable());
-            UpdateMAR?.Invoke(m_MAR.enable());
-            Thread.Sleep(Globals.clockspeed);
+            //load address in register A to MAR
+            MAR.overwriteContents(GPR[registerA].readContents());
 
-            m_MAR.writeToMemory(m_GPR[m_regb].enable());
+            //save the data in register B to RAM
+            MAR.writeToMemory(GPR[registerB].readContents());
         }
 
+        //copy data from RAM to register (next RAM location)
         private void data()
         {
-            //instruction is data, store data in reg b and get next instruction addr
-            m_MAR.set(m_IAR.enable());
-            UpdateMAR?.Invoke(m_MAR.enable());
-            Thread.Sleep(Globals.clockspeed);
+            //prepares next RAM location for access
+            MAR.overwriteContents(IAR.readContents());
 
+            //IAR steps over data to next instruction
             incrementIAR();
 
-            m_GPR[m_regb].set(m_MAR.readFromMemory());
-            UpdateGPRs?.Invoke(m_GPR[m_regb].enable(), m_regb);
+            //copy data to register B
+            GPR[registerB].overwriteContents(MAR.readFromMemory());
+            WriteToGPR?.Invoke(GPR[registerB].readContents(), registerB);
             Thread.Sleep(Globals.clockspeed);
         }
 
-        private void jumpRegister()
-        {
-            m_IAR.set(m_GPR[m_regb].enable());
-            UpdateIAR?.Invoke(m_IAR.enable());
-            Thread.Sleep(Globals.clockspeed);
-        }
+        //jump to address stored in register B
+        private void jumpRegister() { IAR.overwriteContents(GPR[registerB].readContents()); }
 
+        //jump to address thats in the next RAM location
         private void jump()
         {
-            //jump to address in instruction
-            m_MAR.set(m_IAR.enable());
-            UpdateMAR?.Invoke(m_MAR.enable());
-            Thread.Sleep(Globals.clockspeed);
-
-            m_IAR.set(m_MAR.readFromMemory());
-            UpdateIAR?.Invoke(m_IAR.enable());
-            Thread.Sleep(Globals.clockspeed);
+            MAR.overwriteContents(IAR.readContents());
+            IAR.overwriteContents(MAR.readFromMemory());
         }
 
+        //jumps to an address in next RAM location if condition is met
         private void jumpIf(BitArray condition)
         {
             if (condition.Length == Globals.NO_OF_FLAGS)
@@ -1291,31 +1329,22 @@ namespace CPU_Simulator
 
                 //check provided flags are all on
                 for (int count = 0; count < Globals.NO_OF_FLAGS && conditionmet; count++)
-                    if (condition[count] && !m_ALU.m_flags[count]) conditionmet = false;
+                    if (condition[count] && !ALU.flags[count]) conditionmet = false;
 
                 //flags on, jump to address
                 if (conditionmet)
                 {
-                    m_MAR.set(m_IAR.enable());
-                    UpdateMAR?.Invoke(m_MAR.enable());
-                    Thread.Sleep(Globals.clockspeed);
-
-                    m_IAR.set(m_MAR.readFromMemory());
-                    UpdateIAR?.Invoke(m_IAR.enable());
-                    Thread.Sleep(Globals.clockspeed);
+                    MAR.overwriteContents(IAR.readContents());
+                    IAR.overwriteContents(MAR.readFromMemory());
                 }
 
-                //move to next instruction
+                //skip jump address
                 else incrementIAR();
             }
 
             else MessageBox.Show("Invalid condition");
         }
 
-        private void resetFlags()
-        {
-            for (int count = 0; count < Globals.NO_OF_FLAGS; count++)
-                m_ALU.m_flags[count] = false;
-        }
+        private void resetFlags() { for (int count = 0; count < Globals.NO_OF_FLAGS; count++) ALU.flags[count] = false; }
     }
 }
