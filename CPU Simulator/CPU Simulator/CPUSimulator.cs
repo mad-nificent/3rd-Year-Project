@@ -12,14 +12,19 @@ using System.Threading;
 
 namespace CPU_Simulator
 {
-    public delegate void EnableRegister();
-    public delegate void SetRegister(BitArray data);
-    public delegate void SetEnableGPR(BitArray data, int index);    //this is used to set GUI contents of RAM and GPR, and also to show contents being read from RAM
+    //reflect contents being written to or read from a register
+    public delegate void SetEnableRegister(BitArray data, bool read);
+    
+    //same principle, but uses index of GPR or RAM address
+    public delegate void SetEnableGPR(BitArray data, int index, bool read);
+
+    //reset item colours after a period of time
+    public delegate void RedrawGUI();
 
     public partial class MainForm : Form
     {
-        System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
-
+        //PRIVATE
+        //------------------------------------------------------------
         private ControlUnit CU;
 
         //CPU components
@@ -47,41 +52,10 @@ namespace CPU_Simulator
         private Label lblMAR = new Label();
         private Label lblMARContents = new Label();
 
-        private Panel[] pnlGPR = new Panel[Globals.NO_OF_GPR];
-        private Label[] lblGPR = new Label[Globals.NO_OF_GPR];
-        private Label[] lblGPRContents = new Label[Globals.NO_OF_GPR];
+        private Panel[] pnlGPR = new Panel[Globals.GPR_COUNT];
+        private Label[] lblGPR = new Label[Globals.GPR_COUNT];
+        private Label[] lblGPRContents = new Label[Globals.GPR_COUNT];
         //--------------------------------
-
-        public MainForm()
-        {
-            InitializeComponent();
-            Paint += drawBus;           //bus will be reset on redraw
-
-            drawCPU();
-
-            //instructions
-            BitArray loadintoreg1 = new BitArray(new bool[] { false, false, false, false, false, true,  false, false });
-            BitArray inputa       = new BitArray(new bool[] { false, false, true,  false, false, false, false, false });
-            BitArray jumptoaddr   = new BitArray(new bool[] { false, false, false, false, true,  true,  false, false });
-            BitArray empty        = new BitArray(new bool[] { false, false, false, false, false, false, false, false });
-            BitArray loadintoreg3 = new BitArray(new bool[] { false, true,  false, false, false, true,  false, false });
-            BitArray inputc       = new BitArray(new bool[] { false, false, false, false, false, false, false, true  });
-
-            //set instructions to load
-            BitArray[] instructions = new BitArray[] { loadintoreg1, inputa, jumptoaddr, empty, loadintoreg3, inputc };
-
-            //link GUI events to CPU registers
-            CU = new ControlUnit(instructions, readRAMLocation, overwriteRAMLocation, 
-                enableBus, updateIARContents, updateIRContents, updateMARContents,
-                updateTMPContents, updateAccumulatorContents);
-
-            timer.Interval = Globals.clockspeed;
-            timer.Tick += new EventHandler(resetColours);
-            timer.Enabled = true;
-            timer.Start();
-
-            CU.WriteToGPR += updateGPRContents;
-        }
 
         private void drawCPU()
         {
@@ -90,7 +64,7 @@ namespace CPU_Simulator
             //TMP register
             //--------------------------------------------
             pnlTMP.SuspendLayout();
-        
+
             pnlTMP.BorderStyle = BorderStyle.FixedSingle;
             pnlTMP.Location = new Point(80, 60);
             pnlTMP.Size = new Size(80, 50);
@@ -242,7 +216,7 @@ namespace CPU_Simulator
             pnlMAR.PerformLayout();
             //--------------------------------------------
 
-            for (int count = 0; count < Globals.NO_OF_GPR; count++)
+            for (int count = 0; count < Globals.GPR_COUNT; count++)
             {
                 pnlGPR[count] = new Panel();
                 lblGPR[count] = new Label();
@@ -351,130 +325,16 @@ namespace CPU_Simulator
             pnlGPR[3].PerformLayout();
             //--------------------------------------------
 
-            Invalidate();
             ResumeLayout();
             PerformLayout();
+
+            drawBus();
         }
 
-        private void btnDecrease_Click(object sender, EventArgs e)
+        private void drawBus()
         {
-            if (Globals.clockspeed != 1)
-            {
-                if (Globals.clockspeed == 500)
-                {
-                    Globals.clockspeed -= 499;
-                    lblClock.Text = "Real-time";
-                }
+            SuspendLayout();
 
-                else
-                {
-                    Globals.clockspeed -= 500;
-                    lblClock.Text = Globals.clockspeed.ToString();
-                }
-
-                timer.Interval = Globals.clockspeed;
-            }
-        }
-
-        private void btnIncrease_Click(object sender, EventArgs e)
-        {
-            if (Globals.clockspeed == 1) Globals.clockspeed += 499;
-            else Globals.clockspeed += 500;
-
-            lblClock.Text = Globals.clockspeed.ToString();
-            timer.Interval = Globals.clockspeed;
-        }
-
-        private void btnStart_Click(object sender, EventArgs e)
-        {
-            Thread CPUThread = new Thread(new ThreadStart(CU.start));
-            CPUThread.Start();
-        }
-
-        private void drawBus(object sender, PaintEventArgs e)
-        {
-            Graphics g = CreateGraphics();
-
-            Pen myPen = new System.Drawing.Pen(Color.Black);
-            myPen.Width = 1;
-
-            //bus
-            //---------------------------------
-            //line from MAR to top left
-            g.DrawLine(myPen, 415, 40, 15, 40);
-            g.DrawLine(myPen, 415, 35, 10, 35);
-
-            //line from top left to bottom
-            g.DrawLine(myPen, 15, 40, 15, 465);
-            g.DrawLine(myPen, 10, 35, 10, 470);
-
-            //line from bottom left to right
-            g.DrawLine(myPen, 10, 470, 760, 470);
-            g.DrawLine(myPen, 15, 465, 755, 465);
-
-            //line from bottom right to RAM
-            g.DrawLine(myPen, 760, 470, 760, 60);
-            g.DrawLine(myPen, 755, 465, 755, 60);
-            //---------------------------------
-
-            //bus to other components
-            //----------------------------------------
-            //line from bus to tmp
-            g.DrawLine(myPen, 117.5f, 35, 117.5f, 75);
-            g.DrawLine(myPen, 122.5f, 35, 122.5f, 75);
-
-            //line from bus to ALU
-            g.DrawLine(myPen, 57.5f, 35, 57.5f, 180);
-            g.DrawLine(myPen, 62.5f, 35, 62.5f, 180);
-
-            //line from tmp to bus1
-            g.DrawLine(myPen, 117.5f, 110, 117.5f, 130);
-            g.DrawLine(myPen, 122.5f, 110, 122.5f, 130);
-
-            //line from bus1 to ALU
-            g.DrawLine(myPen, 117.5f, 155, 117.5f, 180);
-            g.DrawLine(myPen, 122.5f, 155, 122.5f, 180);
-
-            //line from ALU to ACC
-            g.DrawLine(myPen, 87.5f, 375, 87.5f, 395);
-            g.DrawLine(myPen, 92.5f, 375, 92.5f, 395);
-
-            //line from ACC to bus
-            g.DrawLine(myPen, 87.5f, 445, 87.5f, 470);
-            g.DrawLine(myPen, 92.5f, 445, 92.5f, 470);
-
-            //line from bus to between IAR and IR
-            g.DrawLine(myPen, 447.5f, 470, 447.5f, 422.5f);
-            g.DrawLine(myPen, 452.5f, 470, 452.5f, 422.5f);
-
-            //line from bus to IAR
-            g.DrawLine(myPen, 452.5f, 422.5f, 430, 422.5f);
-            g.DrawLine(myPen, 452.5f, 427.5f, 430, 427.5f);
-
-            //line from bus to IR
-            g.DrawLine(myPen, 447.5f, 422.5f, 470, 422.5f);
-            g.DrawLine(myPen, 447.5f, 427.5f, 470, 427.5f);
-
-            //line from bus to GPR1
-            g.DrawLine(myPen, 735, 182.5f, 760, 182.5f);
-            g.DrawLine(myPen, 735, 187.5f, 760, 187.5f);
-
-            //line from bus to GPR2
-            g.DrawLine(myPen, 735, 242.5f, 760, 242.5f);
-            g.DrawLine(myPen, 735, 247.5f, 760, 247.5f);
-
-            //line from bus to GPR3
-            g.DrawLine(myPen, 735, 302.5f, 760, 302.5f);
-            g.DrawLine(myPen, 735, 307.5f, 760, 307.5f);
-
-            //line from bus to GPR4
-            g.DrawLine(myPen, 735, 362.5f, 760, 362.5f);
-            g.DrawLine(myPen, 735, 367.5f, 760, 367.5f);
-            //----------------------------------------
-        }
-
-        public void drawBus()
-        {
             Graphics g = CreateGraphics();
 
             Pen myPen = new Pen(Color.Black);
@@ -553,215 +413,385 @@ namespace CPU_Simulator
             g.DrawLine(myPen, 735, 362.5f, 760, 362.5f);
             g.DrawLine(myPen, 735, 367.5f, 760, 367.5f);
             //----------------------------------------
-        }
-
-        public void resetColours(object source, EventArgs e)
-        {
-            SuspendLayout();
-
-            lblIRContents.ForeColor = Color.Black;
-            lblIARContents.ForeColor = Color.Black;
-            lblMARContents.ForeColor = Color.Black;
-            lblRAMContents.ForeColor = Color.Black;
-            lblTMPContents.ForeColor = Color.Black;
-            lblAccumulatorContents.ForeColor = Color.Black;
-
-            for (int count = 0; count < Globals.NO_OF_GPR; count++)
-            {
-                lblGPRContents[count].ForeColor = Color.Black;
-            }
 
             ResumeLayout();
-            drawBus();
+            PerformLayout();
+        }
+
+        //GUI controls
+        //-------------------------------------
+        private void btnDecrease_Click(object sender, EventArgs e)
+        {
+            if (Globals.CLOCK_SPEED != 0)
+            {
+                Globals.CLOCK_SPEED -= 1000;
+
+                if (Globals.CLOCK_SPEED == 0) lblClock.Text = "Real-time";
+                else lblClock.Text = Globals.CLOCK_SPEED.ToString();
+            }
+        }
+
+        private void btnIncrease_Click(object sender, EventArgs e)
+        {
+            Globals.CLOCK_SPEED += 1000;
+            lblClock.Text = Globals.CLOCK_SPEED.ToString();
+        }
+
+        private void btnStart_Click(object sender, EventArgs e)
+        {
+            Thread CPUThread = new Thread(new ThreadStart(CU.start));
+            CPUThread.Start();
+        }
+        //-------------------------------------
+
+        //------------------------------------------------------------
+
+        //PUBLIC
+        //------------------------------------------------------------
+        public MainForm()
+        {
+            InitializeComponent();
+
+            drawCPU();
+
+            //                                               register B   |  register A   |           opcode
+            //                                                2      1    |   2      1    | last                 first
+            //BitArray load     = new BitArray(new bool[] { false, false, | false, false, | false, false, false, false });
+            //BitArray store    = new BitArray(new bool[] { false, false, | false, false, | true,  false, false, false });
+            //BitArray data     = new BitArray(new bool[] { false, false, | false, false, | false, true,  false, false });
+            //BitArray jumpRG   = new BitArray(new bool[] { false, false, | false, false, | true,  true,  false, false });
+            //BitArray jump     = new BitArray(new bool[] { false, false, | false, false, | false, false, true,  false });
+            //BitArray jumpIf   = new BitArray(new bool[] { false, false, | false, false, | true,  false, true,  false });
+            //BitArray resetFlg = new BitArray(new bool[] { false, false, | false, false, | false, true,  true,  false });
+            //BitArray IO       = new BitArray(new bool[] { false, false, | false, false, | true,  true,  true,  false });
+            //------------------------------------------------------------|---------------|-------------------------------
+            //BitArray add      = new BitArray(new bool[] { false, false, | false, false, | false, false, false, true });
+            //BitArray rShift   = new BitArray(new bool[] { false, false, | false, false, | true,  false, false, true });
+            //BitArray lShift   = new BitArray(new bool[] { false, false, | false, false, | false, true,  false, true });
+            //BitArray not      = new BitArray(new bool[] { false, false, | false, false, | true,  true,  false, true });
+            //BitArray and      = new BitArray(new bool[] { false, false, | false, false, | false, false, true,  true });
+            //BitArray or       = new BitArray(new bool[] { false, false, | false, false, | true,  false, true,  true });
+            //BitArray xor      = new BitArray(new bool[] { false, false, | false, false, | false, true,  true,  true });
+            //BitArray compare  = new BitArray(new bool[] { false, false, | false, false, | true,  true,  true,  true });
+
+
+            //instructions
+            BitArray data       = new BitArray(new bool[] { false, true,    false, false,   false,  true, false, false });
+            //------------------------------------------------------------------------------------------------------------
+            BitArray value      = new BitArray(new bool[] { true,  true,    false, false,   false, false, false, false });
+            //------------------------------------------------------------------------------------------------------------
+
+            BitArray dataB      = new BitArray(new bool[] { true, false,    false, false,   false,  true, false, false });
+            //------------------------------------------------------------------------------------------------------------
+            BitArray valueB     = new BitArray(new bool[] { false, true,    false, false,   false, false, false, false });
+            //------------------------------------------------------------------------------------------------------------
+
+            BitArray compare    = new BitArray(new bool[] { true,  false,   false,  true,    true,  true,  true,  true });
+            BitArray jumpIf     = new BitArray(new bool[] { false,  true,   false,  true,    true, false,  true, false });
+            BitArray nextAddr   = new BitArray(new bool[] { false, false,   false,  true,   false, false, false, false });
+            BitArray skip       = new BitArray(new bool[] { false,  true,   false, false,   false,  true, false, false });
+
+            BitArray dataC      = new BitArray(new bool[] {  true,  true,   false, false,   false,  true, false, false });
+            //------------------------------------------------------------------------------------------------------------
+            BitArray valueC     = new BitArray(new bool[] { true,  false,   false, false,   false, false, false, false });
+            //------------------------------------------------------------------------------------------------------------
+
+            //set instructions to load
+            BitArray[] instructions = new BitArray[] { data, value, dataB, valueB, compare, jumpIf, nextAddr, skip, dataC, valueC };
+
+            //link GUI events to CPU registers
+            CU = new ControlUnit(instructions, accessRAMLocation,                                   
+                updateIARContents, updateIRContents, updateMARContents,                             
+                updateTMPContents, updateAccumulatorContents, 
+                accessGPRContents, resetColours);
         }
 
         //CPU state changes
         //-------------------------------------
-        public void updateIARContents(BitArray data)
+        public void updateIARContents(BitArray data, bool read)
         {
-            if (InvokeRequired) Invoke(new SetRegister(updateIARContents), new object[] { data });
+            if (InvokeRequired) Invoke(new SetEnableRegister(updateIARContents), new object[] { data, read });
             else
             {
-                lblIARContents.Text = Globals.convertBitsToString(data);
-                lblIARContents.ForeColor = Color.Red;
-            }
-        }
-
-        public void updateIRContents(BitArray data)
-        {
-            if (InvokeRequired) Invoke(new SetRegister(updateIRContents), new object[] { data });
-            else
-            {
-                lblIRContents.Text = Globals.convertBitsToString(data);
-                lblIRContents.ForeColor = Color.Red;
-            }
-        }
-
-        public void updateMARContents(BitArray data)
-        {
-            if (InvokeRequired) Invoke(new SetRegister(updateMARContents), new object[] { data });
-            else
-            {
-                lblMARContents.Text = Globals.convertBitsToString(data);
-                lblMARContents.ForeColor = Color.Red;
-            }
-        }
-
-        public void updateTMPContents(BitArray data)
-        {
-            if (InvokeRequired) Invoke(new SetRegister(updateTMPContents), new object[] { data });
-            else
-            {
-                lblTMPContents.Text = Globals.convertBitsToString(data);
-                lblTMPContents.ForeColor = Color.Red;
-            }
-        }
-
-        public void updateAccumulatorContents(BitArray data)
-        {
-            if (InvokeRequired) Invoke(new SetRegister(updateAccumulatorContents), new object[] { data });
-            else
-            {
-                lblAccumulatorContents.Text = Globals.convertBitsToString(data);
-                lblAccumulatorContents.ForeColor = Color.Red;
-            }
-        }
-
-        public void readRAMLocation(BitArray data, int address)
-        {
-            if (InvokeRequired) Invoke(new SetEnableGPR(readRAMLocation), new object[] { data, address });
-            else
-            {
-                lblRAMContents.Text = Globals.convertBitsToString(data);
-                lblRAMContents.ForeColor = Color.Blue;
-                lblAddr.Text = "Addr " + address.ToString();
-            }
-        }
-
-        public void overwriteRAMLocation(BitArray data, int address)
-        {
-            if (InvokeRequired) Invoke(new SetEnableGPR(overwriteRAMLocation), new object[] { data, address });
-            else
-            {
-                lblRAMContents.Text = Globals.convertBitsToString(data);
-                lblRAMContents.ForeColor = Color.Red;
-                lblAddr.Text = "Addr " + address.ToString();
-            }
-        }
-
-        public void updateGPRContents(BitArray data, int GPRindex)
-        {
-            if (InvokeRequired) Invoke(new SetEnableGPR(updateGPRContents), new object[] { data, GPRindex });
-            else
-            {
-                if (GPRindex < Globals.NO_OF_GPR)
+                if (read)
                 {
-                    lblGPRContents[GPRindex].Text = Globals.convertBitsToString(data);
-                    lblGPRContents[GPRindex].ForeColor = Color.Red;
+                    enableBus();
+                    lblIARContents.ForeColor = Color.Blue;
+                }
+
+                else if (data != null)
+                {
+                    lblIARContents.Text = Globals.convertBitsToString(data);
+                    lblIARContents.ForeColor = Color.Red;
+                }
+            }
+        }
+
+        public void updateIRContents(BitArray data, bool read)
+        {
+            if (InvokeRequired) Invoke(new SetEnableRegister(updateIRContents), new object[] { data, read });
+            else
+            {
+                if (read)
+                {
+                    enableBus();
+                    lblIRContents.ForeColor = Color.Blue;
+                }
+
+                else if (data != null)
+                {
+                    lblIRContents.Text = Globals.convertBitsToString(data);
+                    lblIRContents.ForeColor = Color.Red;
+                }
+            }
+        }
+
+        public void updateMARContents(BitArray data, bool read)
+        {
+            if (InvokeRequired) Invoke(new SetEnableRegister(updateMARContents), new object[] { data, read });
+            else
+            {
+                if (read)
+                {
+                    enableBus();
+                    lblMARContents.ForeColor = Color.Blue;
+                }
+
+                else if (data != null)
+                {
+                    lblMARContents.Text = Globals.convertBitsToString(data);
+                    lblMARContents.ForeColor = Color.Red;
+                }
+            }
+        }
+
+        public void updateTMPContents(BitArray data, bool read)
+        {
+            if (InvokeRequired) Invoke(new SetEnableRegister(updateTMPContents), new object[] { data, read });
+            else
+            {
+                if (read)
+                {
+                    enableBus();
+                    lblTMPContents.ForeColor = Color.Blue;
+                }
+
+                else if (data != null)
+                {
+                    lblTMPContents.Text = Globals.convertBitsToString(data);
+                    lblTMPContents.ForeColor = Color.Red;
+                }
+            }
+        }
+
+        public void updateAccumulatorContents(BitArray data, bool read)
+        {
+            if (InvokeRequired) Invoke(new SetEnableRegister(updateAccumulatorContents), new object[] { data, read });
+            else
+            {
+                if (read)
+                {
+                    enableBus();
+                    lblAccumulatorContents.ForeColor = Color.Blue;
+                }
+
+                else if (data != null)
+                {
+                    lblAccumulatorContents.Text = Globals.convertBitsToString(data);
+                    lblAccumulatorContents.ForeColor = Color.Red;
+                }
+            }
+        }
+
+        public void accessRAMLocation(BitArray data, int address, bool read)
+        {
+            if (InvokeRequired) Invoke(new SetEnableGPR(accessRAMLocation), new object[] { data, address, read });
+            else
+            {
+                if (address < Globals.RAM_SIZE && data != null)
+                {
+                    lblRAMContents.Text = Globals.convertBitsToString(data);
+                    lblAddr.Text = "Addr " + address.ToString();
+
+                    if (read)
+                    {
+                        lblRAMContents.ForeColor = Color.Blue;
+                        enableBus();
+                    }
+
+                    else
+                    {
+                        lblRAMContents.ForeColor = Color.Red;
+                    }
+                }
+            }
+        }
+
+        public void accessGPRContents(BitArray data, int GPRindex, bool read)
+        {
+            if (InvokeRequired) Invoke(new SetEnableGPR(accessGPRContents), new object[] { data, GPRindex, read });
+            else
+            {
+                if (GPRindex < Globals.GPR_COUNT)
+                {
+                    if (read)
+                    {
+                        lblGPRContents[GPRindex].ForeColor = Color.Blue;
+                        enableBus();
+                    }
+
+                    else if (data != null)
+                    {
+                        lblGPRContents[GPRindex].Text = Globals.convertBitsToString(data);
+                        lblGPRContents[GPRindex].ForeColor = Color.Red;
+                    }
                 }
             }
         }
 
         public void enableBus()
         {
-            if (InvokeRequired) Invoke(new EnableRegister(enableBus));
+            Graphics g = CreateGraphics();
+            Pen myPen = new Pen(Color.Red);
+            myPen.Width = 1;
+
+            //bus
+            //---------------------------------
+            //line from MAR to top left
+            g.DrawLine(myPen, 415, 40, 15, 40);
+            g.DrawLine(myPen, 415, 35, 10, 35);
+
+            //line from top left to bottom
+            g.DrawLine(myPen, 15, 40, 15, 465);
+            g.DrawLine(myPen, 10, 35, 10, 470);
+
+            //line from bottom left to right
+            g.DrawLine(myPen, 10, 470, 760, 470);
+            g.DrawLine(myPen, 15, 465, 755, 465);
+
+            //line from bottom right to RAM
+            g.DrawLine(myPen, 760, 470, 760, 60);
+            g.DrawLine(myPen, 755, 465, 755, 60);
+            //---------------------------------
+
+            //bus to other components
+            //----------------------------------------
+            //line from bus to tmp
+            g.DrawLine(myPen, 117.5f, 35, 117.5f, 75);
+            g.DrawLine(myPen, 122.5f, 35, 122.5f, 75);
+
+            //line from bus to ALU
+            g.DrawLine(myPen, 57.5f, 35, 57.5f, 180);
+            g.DrawLine(myPen, 62.5f, 35, 62.5f, 180);
+
+            //line from tmp to bus1
+            g.DrawLine(myPen, 117.5f, 110, 117.5f, 130);
+            g.DrawLine(myPen, 122.5f, 110, 122.5f, 130);
+
+            //line from bus1 to ALU
+            g.DrawLine(myPen, 117.5f, 155, 117.5f, 180);
+            g.DrawLine(myPen, 122.5f, 155, 122.5f, 180);
+
+            //line from ALU to ACC
+            g.DrawLine(myPen, 87.5f, 375, 87.5f, 395);
+            g.DrawLine(myPen, 92.5f, 375, 92.5f, 395);
+
+            //line from ACC to bus
+            g.DrawLine(myPen, 87.5f, 445, 87.5f, 470);
+            g.DrawLine(myPen, 92.5f, 445, 92.5f, 470);
+
+            //line from bus to between IAR and IR
+            g.DrawLine(myPen, 447.5f, 470, 447.5f, 422.5f);
+            g.DrawLine(myPen, 452.5f, 470, 452.5f, 422.5f);
+
+            //line from bus to IAR
+            g.DrawLine(myPen, 452.5f, 422.5f, 430, 422.5f);
+            g.DrawLine(myPen, 452.5f, 427.5f, 430, 427.5f);
+
+            //line from bus to IR
+            g.DrawLine(myPen, 447.5f, 422.5f, 470, 422.5f);
+            g.DrawLine(myPen, 447.5f, 427.5f, 470, 427.5f);
+
+            //line from bus to GPR1
+            g.DrawLine(myPen, 735, 182.5f, 760, 182.5f);
+            g.DrawLine(myPen, 735, 187.5f, 760, 187.5f);
+
+            //line from bus to GPR2
+            g.DrawLine(myPen, 735, 242.5f, 760, 242.5f);
+            g.DrawLine(myPen, 735, 247.5f, 760, 247.5f);
+
+            //line from bus to GPR3
+            g.DrawLine(myPen, 735, 302.5f, 760, 302.5f);
+            g.DrawLine(myPen, 735, 307.5f, 760, 307.5f);
+
+            //line from bus to GPR4
+            g.DrawLine(myPen, 735, 362.5f, 760, 362.5f);
+            g.DrawLine(myPen, 735, 367.5f, 760, 367.5f);
+            //----------------------------------------
+        }
+
+        public void resetColours()
+        {
+            if (InvokeRequired) Invoke(new RedrawGUI(resetColours));
             else
             {
-                Graphics g = CreateGraphics();
+                SuspendLayout();
 
-                Pen myPen = new Pen(Color.Red);
-                myPen.Width = 1;
+                lblIRContents.ForeColor = Color.Black;
+                lblIARContents.ForeColor = Color.Black;
+                lblMARContents.ForeColor = Color.Black;
+                lblRAMContents.ForeColor = Color.Black;
+                lblTMPContents.ForeColor = Color.Black;
+                lblAccumulatorContents.ForeColor = Color.Black;
 
-                //bus
-                //---------------------------------
-                //line from MAR to top left
-                g.DrawLine(myPen, 415, 40, 15, 40);
-                g.DrawLine(myPen, 415, 35, 10, 35);
+                for (int count = 0; count < Globals.GPR_COUNT; count++)
+                {
+                    lblGPRContents[count].ForeColor = Color.Black;
+                }
 
-                //line from top left to bottom
-                g.DrawLine(myPen, 15, 40, 15, 465);
-                g.DrawLine(myPen, 10, 35, 10, 470);
-
-                //line from bottom left to right
-                g.DrawLine(myPen, 10, 470, 760, 470);
-                g.DrawLine(myPen, 15, 465, 755, 465);
-
-                //line from bottom right to RAM
-                g.DrawLine(myPen, 760, 470, 760, 60);
-                g.DrawLine(myPen, 755, 465, 755, 60);
-                //---------------------------------
-
-                //bus to other components
-                //----------------------------------------
-                //line from bus to tmp
-                g.DrawLine(myPen, 117.5f, 35, 117.5f, 75);
-                g.DrawLine(myPen, 122.5f, 35, 122.5f, 75);
-
-                //line from bus to ALU
-                g.DrawLine(myPen, 57.5f, 35, 57.5f, 180);
-                g.DrawLine(myPen, 62.5f, 35, 62.5f, 180);
-
-                //line from tmp to bus1
-                g.DrawLine(myPen, 117.5f, 110, 117.5f, 130);
-                g.DrawLine(myPen, 122.5f, 110, 122.5f, 130);
-
-                //line from bus1 to ALU
-                g.DrawLine(myPen, 117.5f, 155, 117.5f, 180);
-                g.DrawLine(myPen, 122.5f, 155, 122.5f, 180);
-
-                //line from ALU to ACC
-                g.DrawLine(myPen, 87.5f, 375, 87.5f, 395);
-                g.DrawLine(myPen, 92.5f, 375, 92.5f, 395);
-
-                //line from ACC to bus
-                g.DrawLine(myPen, 87.5f, 445, 87.5f, 470);
-                g.DrawLine(myPen, 92.5f, 445, 92.5f, 470);
-
-                //line from bus to between IAR and IR
-                g.DrawLine(myPen, 447.5f, 470, 447.5f, 422.5f);
-                g.DrawLine(myPen, 452.5f, 470, 452.5f, 422.5f);
-
-                //line from bus to IAR
-                g.DrawLine(myPen, 452.5f, 422.5f, 430, 422.5f);
-                g.DrawLine(myPen, 452.5f, 427.5f, 430, 427.5f);
-
-                //line from bus to IR
-                g.DrawLine(myPen, 447.5f, 422.5f, 470, 422.5f);
-                g.DrawLine(myPen, 447.5f, 427.5f, 470, 427.5f);
-
-                //line from bus to GPR1
-                g.DrawLine(myPen, 735, 182.5f, 760, 182.5f);
-                g.DrawLine(myPen, 735, 187.5f, 760, 187.5f);
-
-                //line from bus to GPR2
-                g.DrawLine(myPen, 735, 242.5f, 760, 242.5f);
-                g.DrawLine(myPen, 735, 247.5f, 760, 247.5f);
-
-                //line from bus to GPR3
-                g.DrawLine(myPen, 735, 302.5f, 760, 302.5f);
-                g.DrawLine(myPen, 735, 307.5f, 760, 307.5f);
-
-                //line from bus to GPR4
-                g.DrawLine(myPen, 735, 362.5f, 760, 362.5f);
-                g.DrawLine(myPen, 735, 367.5f, 760, 367.5f);
-                //----------------------------------------
+                ResumeLayout();
+                drawBus();
             }
         }
         //-------------------------------------
+
+        //------------------------------------------------------------
     }
 
     public static class Globals
     {
-        public const int RAM_SIZE = 256;
-        public const int NO_OF_FLAGS = 4;
-        public const int NO_OF_GPR = 4;
-        public const int BYTE_LENGTH = 8;
-        public const int BYTE_LAST = BYTE_LENGTH - 1;
-        public const int OPCODE_LENGTH = BYTE_LENGTH / 2;
-        public const int OPCODE_LAST = OPCODE_LENGTH - 1;
-        public const int REGISTER_CODE_LENGTH = 2;
+        public static int CLOCK_SPEED = 0;
+        public const int  FLAG_COUNT  = 4;
+        
+        //supported memory space
+        public const int RAM_SIZE   = 256;
+        public const int GPR_COUNT  = 4;
 
-        public static int clockspeed = 1;
+        //supported length of data/instruction in bits
+        public const int DATA_INSTRUCTION_SIZE      = 8;
+        public const int FIRST_DATA_INSTRUCTION_BIT = DATA_INSTRUCTION_SIZE - 1;
+
+        //supported length of an opcode in bits
+        public const int OPCODE_SIZE      = DATA_INSTRUCTION_SIZE / 2;
+        public const int FIRST_OPCODE_BIT = OPCODE_SIZE - 1;
+        public const int ALU_OPCODE       = FIRST_OPCODE_BIT;
+
+        //supported length of GPR address in bits
+        public const int REGISTER_ADDRESS_SIZE = 2;
+
+        //register access modes
+        public const bool REGISTER_READ  = true;
+        public const bool REGISTER_WRITE = false;
+
+        public static BitArray reverseBitArray(BitArray data)
+        {
+            BitArray reversedData = new BitArray(data.Length);
+
+            for (int reverseCount = data.Length - 1, count = 0; reverseCount >= 0 && count < data.Length; reverseCount--, count++)
+                reversedData[count] = data[reverseCount];
+
+            return reversedData;
+        }
 
         public static string convertBitsToString(BitArray data)
         {
@@ -783,7 +813,7 @@ namespace CPU_Simulator
         {
             bool equal = true;
 
-            for (int count = 0; count < BYTE_LENGTH && equal; count++)
+            for (int count = 0; count < DATA_INSTRUCTION_SIZE && equal; count++)
             {
                 if (!one[count] && two[count] 
                     || one[count] && !two[count]) equal = false;
@@ -795,218 +825,190 @@ namespace CPU_Simulator
 
     public class Register
     {
-        public event EnableRegister OutputToBus;
-        public event SetRegister OverwriteContents;
+        //PRIVATE
+        //------------------------------------------------------------
+        private BitArray contents = new BitArray(Globals.DATA_INSTRUCTION_SIZE);
+        //------------------------------------------------------------
 
-        private BitArray contents = new BitArray(Globals.BYTE_LENGTH);
+        //PUBLIC
+        //------------------------------------------------------------
+        public event SetEnableRegister AccessContents;
 
-        //used by GPRs and RAM, they are set with an index so GUI can show address/select correct GPU
-        public Register(EnableRegister outputToBus) { OutputToBus += outputToBus; }
+        public Register() {}
 
-        //used by SPRs
-        public Register(EnableRegister outputToBus, SetRegister overwriteContents)
-        {
-            OutputToBus += outputToBus;
-            OverwriteContents += overwriteContents;
-        }
+        public Register(SetEnableRegister accessContents) { AccessContents += accessContents; }
 
-        //write data to the register
         public void overwriteContents(BitArray contents)
         {
-            OverwriteContents?.Invoke(contents);
-            Thread.Sleep(Globals.clockspeed);
+            //invoke event in write state
+            AccessContents?.Invoke(contents, Globals.REGISTER_WRITE);
+            if (AccessContents != null) Thread.Sleep(Globals.CLOCK_SPEED);
             this.contents = contents;
         }
 
-        //read data stored in the register
         public BitArray readContents()
         {
-            OutputToBus?.Invoke();
-            Thread.Sleep(Globals.clockspeed);
+            //invoke event in read state
+            AccessContents?.Invoke(null, Globals.REGISTER_READ);
             return contents;
         }
+
+        //access contents of a register without running GUI events
+        public BitArray getContents() { return contents; }
+        //------------------------------------------------------------
     }
 
     public class RAM
     {
-        public event SetEnableGPR ReadLocation;
-        public event SetEnableGPR OverwriteLocation;
-
+        //PRIVATE
+        //------------------------------------------------------------
         private Register[] locations = new Register[Globals.RAM_SIZE];
+        //------------------------------------------------------------
 
-        public RAM(BitArray[] instructions, EnableRegister outputToBus, SetEnableGPR readLocation, SetEnableGPR overwriteLocation)
+        //PUBLIC
+        //------------------------------------------------------------
+        public event SetEnableGPR AccessLocation;
+
+        public RAM(BitArray[] instructions, SetEnableGPR accessLocation)
         {
-            ReadLocation  += readLocation;
-            OverwriteLocation += overwriteLocation;
+            AccessLocation += accessLocation;
 
-            //fill RAM with instructions
+            //load instructions into memory
             for (int count = 0; count < instructions.Length; count++)
             {
-                locations[count] = new Register(outputToBus);
+                locations[count] = new Register();
                 locations[count].overwriteContents(instructions[count]);
             }
 
-            //fill remaining RAM with empty registers
+            //create instances of empty memory where instructions end
+            //e.g. if last instruction at loc 34, 35-255 will be empty
             for (int count = instructions.Length; count < Globals.RAM_SIZE; count++)
-                locations[count] = new Register(outputToBus);
+                locations[count] = new Register();
         }
 
         public BitArray readFromLocation(BitArray address)
         {
-            //convert binary address to decimal, used to index RAM
+            //convert address to decimal - so value can be used to index RAM array
             byte[] addr = new byte[1];
             address.CopyTo(addr, 0);
 
-            //access address and get the data
-            ReadLocation?.Invoke(locations[addr[0]].readContents(), addr[0]);
-            Thread.Sleep(Globals.clockspeed);
+            //access address and read the data
+            AccessLocation?.Invoke(locations[addr[0]].readContents(), addr[0], Globals.REGISTER_READ);
             return locations[addr[0]].readContents();
         }
 
         public void writeToLocation(BitArray address, BitArray data)
         {
-            //convert binary address to decimal, used to index RAM
+            //convert address to decimal - so value can be used to index RAM array
             byte[] addr = new byte[1];
             address.CopyTo(addr, 0);
 
-            //access address and put the data
-            OverwriteLocation?.Invoke(data, addr[0]);
-            Thread.Sleep(Globals.clockspeed);
+            //access address and write new data
             locations[addr[0]].overwriteContents(data);
+            AccessLocation?.Invoke(data, addr[0], Globals.REGISTER_WRITE);
+            if (AccessLocation != null) Thread.Sleep(Globals.CLOCK_SPEED);
         }
+        //------------------------------------------------------------
     }
 
     public class MAR : Register
     {
+        //PRIVATE
+        //-------------------------------------
         private RAM RAM;
+        //-------------------------------------
 
-        public MAR(BitArray[] instructions, SetEnableGPR readFromRAM, SetEnableGPR writeToRAM,                  //RAM parameters
-            EnableRegister outputToBus, SetRegister overwriteContents) : base(outputToBus, overwriteContents)   //MAR parameters
-        { RAM = new RAM(instructions, outputToBus, readFromRAM, writeToRAM); }
+        //PUBLIC
+        //-------------------------------------
+        public MAR(BitArray[] instructions, SetEnableGPR accessRAM, SetEnableRegister accessContents) 
+            : base(accessContents)
+        {
+            RAM = new RAM(instructions, accessRAM);
+        }
 
-        //pass address in MAR to RAM to access location and read or write to it
-        public void writeToMemory(BitArray data) { RAM.writeToLocation(this.readContents(), data); }
-        public BitArray readFromMemory() { return RAM.readFromLocation(this.readContents()); }
-    } 
+        //access MAR contents to locate memory address and read/write at the location
+        public void writeToMemory(BitArray data) { RAM.writeToLocation(this.getContents(), data);   }
+        public BitArray readFromMemory()         { return RAM.readFromLocation(this.getContents()); }
+        //-------------------------------------
+    }
 
     public class ALU
     {
-        public static class Flags { public const int COUT = 3, EQUAL = 2, A_LARGER = 1, ZERO = 0; }
+        //PRIVATE
+        //-------------------------------------
+        private bool BUS1 = false;
+        //-------------------------------------
 
-        //change to private (find workaround)
-        public bool bus1 = false;
+        //PUBLIC
+        //-------------------------------------
+        public static class Opcodes { public const string ADD = "1000", R_SHIFT = "1001", L_SHIFT = "1010", NOT     = "1011",
+                                                          AND = "1100", OR      = "1101", XOR     = "1110", COMPARE = "1111"; }
 
-        //flag register and SPRs used by ALU
-        public bool[] flags = new bool[Globals.NO_OF_FLAGS];
-        public Register TMP, accumulator;
+        public static class Flags   { public const int COUT = 3, EQUAL = 2, A_LARGER = 1, ZERO = 0; }
 
-        public ALU(EnableRegister outputToBus, SetRegister overwriteTMP, SetRegister overwriteAccumulator)
+        public bool[] flags = new bool[Globals.FLAG_COUNT];
+        public Register TMP;
+
+        public ALU(SetEnableRegister overwriteTMP)
         {
-            TMP = new Register(outputToBus, overwriteTMP);
-            accumulator = new Register(outputToBus, overwriteAccumulator);
+            TMP = new Register(overwriteTMP);
 
-            //set flags to false
-            for (int count = 0; count < Globals.NO_OF_FLAGS; count++)
-                flags[count] = false;
+            //initialise flags to false
+            for (int count = 0; count < Globals.FLAG_COUNT; count++) flags[count] = false;
         }
 
-        //decode instruction to execute
-        public void readOpcode(BitArray opcode, BitArray primaryInput)
+        public void toggleBUS1()
         {
-            string opcodeAsString = Globals.convertBitsToString(opcode);
-
-            switch (opcodeAsString)
-            {
-                //ADD
-                case "1000":
-                    accumulator.overwriteContents(add(primaryInput));
-                    break;
-
-                //RSHIFT
-                case "1001":
-                    accumulator.overwriteContents(shiftRight(primaryInput));
-                    break;
-
-                //LSHIFT
-                case "1010":
-                    accumulator.overwriteContents(shiftLeft(primaryInput));
-                    break;
-
-                //NOT
-                case "1011":
-                    accumulator.overwriteContents(inverse(primaryInput));
-                    break;
-                
-                //AND
-                case "1100":
-                    accumulator.overwriteContents(and(primaryInput));
-                    break;
-                
-                //OR
-                case "1101":
-                    accumulator.overwriteContents(or(primaryInput));
-                    break;
-                
-                //XOR
-                case "1110":
-                    accumulator.overwriteContents(xor(primaryInput));
-                    break;
-                
-                //compare
-                case "1111":
-                    compare(primaryInput);
-                    break;
-
-                //invalid opcode
-                default:
-                    MessageBox.Show("Invalid opcode");
-                    break;
-            }
+            if (BUS1) BUS1 = false;
+            else BUS1 = true;
         }
 
-        private BitArray add(BitArray firstNumber)
+        public BitArray add(BitArray firstNumber)
         {
-            BitArray secondNumber, result = new BitArray(Globals.BYTE_LENGTH);
+            BitArray secondNumber, result = new BitArray(Globals.DATA_INSTRUCTION_SIZE);
 
-            //examine if request was an increment or add 2 values
-            if (bus1) secondNumber = new BitArray(new byte[] { 1 });
+            //add instruction can use BUS1 register to increment first number
+            //e.g. passing IAR to ALU, enabling BUS1 and running add -> increments IAR
+            if (BUS1) secondNumber = new BitArray(new byte[] { 1 });
             else secondNumber = new BitArray(TMP.readContents());
 
+            bool carryBit = false;
+
             //examine each bit of both values and add them together
-            bool carrybit = false;
-            for (int count = 0; count < Globals.BYTE_LENGTH; count++)
+            for (int count = 0; count < Globals.DATA_INSTRUCTION_SIZE; count++)
             {
-                if (carrybit)
+                //last operation resulted in a carry
+                if (carryBit)
                 {
-                    //0+0+1 = 1 no carry
+                    //0 + 0 + 1 = 1 no carry
                     if (firstNumber[count] == false && secondNumber[count] == false)
                     {
                         result[count] = true;
-                        carrybit = false;
+                        carryBit = false;
                     }
 
-                    //1+1+1 = 1 c1
+                    //1 + 1 + 1 = 1 carry 1
                     else if (firstNumber[count] == true && secondNumber[count] == true)
                         result[count] = true;
 
-                    //1+0+1 = 0 c1
+                    //1 + 0 + 1 = 0 carry 1
                     else result[count] = false;
                 }
 
                 else
                 {
-                    //0+0 = 0 no carry
+                    //0 + 0 = 0 no carry
                     if (firstNumber[count] == false && secondNumber[count] == false)
                         result[count] = false;
 
-                    //1+1 = 0 c1
+                    //1 + 1 = 0 carry 1
                     else if (firstNumber[count] == true && secondNumber[count] == true)
                     {
                         result[count] = false;
-                        carrybit = true;
+                        carryBit = true;
                     }
 
-                    //0+1 = 1 no carry
+                    //0 + 1 = 1 no carry
                     else result[count] = true;
                 }
             }
@@ -1014,52 +1016,54 @@ namespace CPU_Simulator
             return result;
         }
 
-        private BitArray shiftRight(BitArray data)
+        public BitArray shiftRight(BitArray data)
         {
-            BitArray result = new BitArray(Globals.BYTE_LENGTH);
+            BitArray result = new BitArray(Globals.DATA_INSTRUCTION_SIZE);
 
-            //if rightmost bit on its shifted out, enable COUT flag
+            //righmost bit will get shifted out, enable carry flag
             if (data[0]) flags[Flags.COUT] = true;
 
             //look ahead to next bit of a and copy into current bit of result
-            for (int front = 1, back = 0; front < Globals.BYTE_LENGTH; front++, back++)
+            for (int front = 1, back = 0; front < Globals.DATA_INSTRUCTION_SIZE; front++, back++)
                 result[back] = data[front];
 
             return result;
         }
 
-        private BitArray shiftLeft(BitArray data)
+        public BitArray shiftLeft(BitArray data)
         {
-            BitArray result = new BitArray(Globals.BYTE_LENGTH);
+            BitArray result = new BitArray(Globals.DATA_INSTRUCTION_SIZE);
 
-            //if leftmost bit on its shifted out, enable COUT flag
-            if (data[Globals.BYTE_LAST]) flags[Flags.COUT] = true;
+            //leftmost bit will get shifted out, enable carry flag
+            if (data[Globals.FIRST_DATA_INSTRUCTION_BIT]) flags[Flags.COUT] = true;
 
             //copy current bit of a into next bit of result
-            for (int front = 1, back = 0; front < Globals.BYTE_LENGTH; front++, back++)
+            for (int front = 1, back = 0; front < Globals.DATA_INSTRUCTION_SIZE; front++, back++)
                 result[front] = data[back];
 
             return result;
         }
 
-        private BitArray inverse(BitArray data) { return data.Not(); }
+        public BitArray inverse(BitArray data) { return data.Not(); }
 
-        private BitArray and(BitArray data) { return data.And(TMP.readContents()); }
+        public BitArray and(BitArray data) { return data.And(TMP.readContents()); }
 
-        private BitArray or(BitArray data) { return data.Or(TMP.readContents()); }
+        public BitArray or(BitArray data) { return data.Or(TMP.readContents()); }
 
-        private BitArray xor(BitArray data) { return data.Xor(TMP.readContents()); }
+        public BitArray xor(BitArray data) { return data.Xor(TMP.readContents()); }
 
-        private void compare(BitArray firstNumber)
+        public void compare(BitArray firstNumber)
         {
             BitArray secondNumber = new BitArray(TMP.readContents());
             bool isequal = true, iszero = true;
 
-            //count from MSB downward, first unequal bits breaks loop
-            int count = Globals.BYTE_LAST;
+            int count = Globals.FIRST_DATA_INSTRUCTION_BIT;
+
+            //examine most significant bits and work downward
+            //first unequal bits breaks loop
             while (isequal && count >= 0)
             {
-                //check if bit a is true and b is false
+                //first > second
                 if (firstNumber[count] && !secondNumber[count])
                 {
                     isequal = false;
@@ -1067,15 +1071,16 @@ namespace CPU_Simulator
                     flags[Flags.A_LARGER] = true;
                 }
 
-                //check if bit a is false and b is true
+                //first < second
                 else if (!firstNumber[count] && secondNumber[count])
                 {
                     isequal = false;
                     iszero = false;
                 }
 
-                //check if both bits not false
-                else if (firstNumber[count] && secondNumber[count])
+                //first == 1 == second
+                //values are not 0
+                else if (iszero && firstNumber[count] && secondNumber[count])
                     iszero = false;
 
                 count--;
@@ -1084,39 +1089,51 @@ namespace CPU_Simulator
             if (isequal) flags[Flags.EQUAL] = true;
             if (iszero)  flags[Flags.ZERO] = true;
         }
+        //-------------------------------------
     }
 
     public class ControlUnit
     {
-        public event SetEnableGPR WriteToGPR;
-
-        //tracks the address of the last instruction to execute
-        public readonly BitArray lastAddress = new BitArray(Globals.BYTE_LENGTH);
-
+        //PRIVATE
+        //-------------------------------------
         private bool programEnd = false;    //condition to stop execution
         private byte registerA, registerB;  //temporary storage for register addresses in use
 
-        //components and registers
         private ALU ALU;
-        private MAR MAR;
-        private Register IAR, IR;
-        private Register[] GPR = new Register[Globals.NO_OF_GPR];
 
-        public ControlUnit(BitArray[] instructions, SetEnableGPR readFromRAM, SetEnableGPR writeToRAM, 
-            EnableRegister outputToBus, SetRegister overwriteIAR, SetRegister overwriteIR, SetRegister overwriteMAR, 
-            SetRegister overwriteTMP, SetRegister overwriteAccumulator)
+        private MAR MAR;
+        private Register IAR, IR, accumulator;
+        private Register[] GPR = new Register[Globals.GPR_COUNT];
+        //-------------------------------------
+
+        //PUBLIC
+        //-------------------------------------
+        public event SetEnableGPR AccessGPR;
+        public event RedrawGUI TurnOffSetEnableBits;
+
+        //tracks the address of the last instruction to execute
+        public readonly BitArray lastAddress = new BitArray(Globals.DATA_INSTRUCTION_SIZE);
+
+        public ControlUnit(BitArray[] instructions, SetEnableGPR accessRAM,                                     //RAM parameters
+            SetEnableRegister overwriteIAR, SetEnableRegister overwriteIR, SetEnableRegister overwriteMAR,      //register parameters
+            SetEnableRegister overwriteTMP, SetEnableRegister overwriteAccumulator, SetEnableGPR accessGPR,     
+            RedrawGUI turnOffSetEnableBits)
         {
             //intialising each component and register and linking GUI events to them
-            ALU = new ALU(outputToBus, overwriteTMP, overwriteAccumulator);
-            MAR = new MAR(instructions, readFromRAM, writeToRAM, outputToBus, overwriteMAR);
-            IAR = new Register(outputToBus, overwriteIAR);
-            IR = new Register(outputToBus, overwriteIR);
+            ALU         = new ALU(overwriteTMP);
+            accumulator = new Register(overwriteAccumulator);
+            MAR         = new MAR(instructions, accessRAM, overwriteMAR);
+            IAR         = new Register(overwriteIAR);
+            IR          = new Register(overwriteIR);
+
+            AccessGPR += accessGPR;
+            TurnOffSetEnableBits += turnOffSetEnableBits;
 
             lastAddress = new BitArray(new byte[] { (byte)(instructions.Length - 1) });
 
             //initialise GPRs
-            for (int count = 0; count < Globals.NO_OF_GPR; count++)
-                GPR[count] = new Register(outputToBus);
+            for (int count = 0; count < Globals.GPR_COUNT; count++)
+                GPR[count] = new Register();
         }
 
         public void start()
@@ -1127,17 +1144,19 @@ namespace CPU_Simulator
                 programEnd = false;
 
                 //reset values of registers
+                //-------------------------------------
                 MAR.overwriteContents(new BitArray(new byte[] { 0 }));
                 IAR.overwriteContents(new BitArray(new byte[] { 0 }));
                 IR.overwriteContents(new BitArray(new byte[] { 0 }));
-
-                ALU.accumulator.overwriteContents(new BitArray(new byte[] { 0 }));
+                accumulator.overwriteContents(new BitArray(new byte[] { 0 }));
                 ALU.TMP.overwriteContents(new BitArray(new byte[] { 0 }));
 
-                for (int count = 0; count < Globals.NO_OF_GPR; count++)
+                for (int count = 0; count < Globals.GPR_COUNT; count++)
                     GPR[count].overwriteContents(new BitArray(new byte[] { 0 }));
+                //-------------------------------------
             }
 
+            //program loop
             while (!programEnd)
             {
                 fetchInstruction();
@@ -1154,51 +1173,70 @@ namespace CPU_Simulator
             setInstructionRegister();
         }
 
-        public void executeInstruction() { readInstructionRegister(); }
-
-        private void accessMemory() { MAR.overwriteContents(IAR.readContents()); }
+        private void accessMemory()
+        {
+            MAR.overwriteContents(IAR.readContents());
+            TurnOffSetEnableBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+        }
 
         private void incrementIAR()
         {
-            if (Globals.areBitsEqual(IAR.readContents(), lastAddress)) programEnd = true;
+            if (Globals.areBitsEqual(IAR.getContents(), lastAddress)) programEnd = true;
 
             //enable bus1 register
-            ALU.bus1 = true;
+            ALU.toggleBUS1();
 
-            //create opcode for ADD
-            BitArray opcode = new BitArray(Globals.OPCODE_LENGTH);
-            opcode.Set(Globals.OPCODE_LAST, true);
-
-            //method will add bus1 and the IAR
-            ALU.readOpcode(opcode, IAR.readContents());
+            //call ADD instruction on ALU to increment IAR
+            accumulator.overwriteContents(ALU.add(IAR.readContents()));
+            TurnOffSetEnableBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0)  Thread.Sleep(1000);
 
             //turn off bus1
-            ALU.bus1 = false;
+            ALU.toggleBUS1();
 
             //set new value of IAR
-            IAR.overwriteContents(ALU.accumulator.readContents());
+            IAR.overwriteContents(accumulator.readContents());
+            TurnOffSetEnableBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
 
-        private void setInstructionRegister() { IR.overwriteContents(MAR.readFromMemory()); }
+        private void setInstructionRegister()
+        {
+            IR.overwriteContents(MAR.readFromMemory());
+            TurnOffSetEnableBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+        }
+
+        public void executeInstruction() { readInstructionRegister(); }
 
         private void readInstructionRegister()
         {
-            BitArray opcode = new BitArray(Globals.OPCODE_LENGTH),
-                registerA = new BitArray(Globals.REGISTER_CODE_LENGTH), 
-                registerB = new BitArray(Globals.REGISTER_CODE_LENGTH);
+            BitArray opcode = new BitArray(Globals.OPCODE_SIZE),
+                registerA = new BitArray(Globals.REGISTER_ADDRESS_SIZE), 
+                registerB = new BitArray(Globals.REGISTER_ADDRESS_SIZE);
+
+            //have the GUI show CU is reading the contents
+            IR.readContents();
+            Thread.Sleep(Globals.CLOCK_SPEED);
+            TurnOffSetEnableBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
             //copy opcode bits from IR
-            for (int count = Globals.OPCODE_LENGTH, opindex = 0; count < Globals.BYTE_LENGTH; count++, opindex++)
-                opcode[opindex] = IR.readContents()[count];
+            for (int count = Globals.OPCODE_SIZE, opindex = 0; count < Globals.DATA_INSTRUCTION_SIZE; count++, opindex++)
+                opcode[opindex] = IR.getContents()[count];
 
             //deduce the register addresses from IR
-            for (int registerBIndex = 0, registerAIndex = Globals.REGISTER_CODE_LENGTH;     //B is at the start of the code, A is at the index after the end of B
-                registerBIndex < Globals.REGISTER_CODE_LENGTH; 
-                registerBIndex++, registerAIndex++)
+            for (int count = 0, registerACount = Globals.REGISTER_ADDRESS_SIZE;     //B is at the start of the code, A is at the index after the end of B
+                count < Globals.REGISTER_ADDRESS_SIZE; 
+                count++, registerACount++)
             {
-                registerA[registerBIndex] = IR.readContents()[registerAIndex];
-                registerB[registerBIndex] = IR.readContents()[registerBIndex];
+                registerA[count] = IR.getContents()[registerACount];
+                registerB[count] = IR.getContents()[count];
             }
+
+            registerA = Globals.reverseBitArray(registerA);
+            registerB = Globals.reverseBitArray(registerB);
 
             //copy the register addresses back to a decimal value
             byte[] registerADecimal = new byte[1], registerBDecimal = new byte[1];
@@ -1209,21 +1247,81 @@ namespace CPU_Simulator
             this.registerA = registerADecimal[0];
             this.registerB = registerBDecimal[0];
 
-            //opcode leftmost bit is ALU bit
-            if (opcode[3])
+            //ALU instruction (1xxx <- 1st bit represents ALU operation)
+            //                (xxx1 <- bitarray stores binary in reverse)
+            if (opcode[Globals.ALU_OPCODE])
             {
-                //should only set TMP if 2 input operation (needs workaround)
+                string opcodeAsString = Globals.convertBitsToString(opcode);
 
-                //put contents of b in TMP, read and perform instruction, store answer in regb
-                ALU.TMP.overwriteContents(GPR[this.registerB].readContents());
+                //is a 2 input operation
+                if (opcodeAsString != ALU.Opcodes.R_SHIFT && opcodeAsString != ALU.Opcodes.L_SHIFT && opcodeAsString != ALU.Opcodes.NOT)
+                {
+                    //copy register B into TMP
+                    AccessGPR?.Invoke(GPR[this.registerB].getContents(), this.registerB, Globals.REGISTER_READ);
+                    ALU.TMP.overwriteContents(GPR[this.registerB].readContents());
+                    Thread.Sleep(Globals.CLOCK_SPEED);
 
-                //run the ALU instruction
-                ALU.readOpcode(opcode, GPR[this.registerA].readContents());
+                    TurnOffSetEnableBits?.Invoke();
+                    if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+                }
 
-                //SHOULD ONLY SET REG B IF NOT COMPARISON (NEEDS FIX)
-                GPR[this.registerB].overwriteContents(ALU.accumulator.readContents());
-                WriteToGPR?.Invoke(GPR[this.registerB].readContents(), this.registerB);
-                Thread.Sleep(Globals.clockspeed);
+                switch (opcodeAsString)
+                {
+                    //ADD
+                    case ALU.Opcodes.ADD:
+                        accumulator.overwriteContents(ALU.add(GPR[this.registerA].readContents()));
+                        break;
+
+                    //RSHIFT
+                    case ALU.Opcodes.R_SHIFT:
+                        accumulator.overwriteContents(ALU.shiftRight(GPR[this.registerA].readContents()));
+                        break;
+
+                    //LSHIFT
+                    case ALU.Opcodes.L_SHIFT:
+                        accumulator.overwriteContents(ALU.shiftLeft(GPR[this.registerA].readContents()));
+                        break;
+
+                    //NOT
+                    case ALU.Opcodes.NOT:
+                        accumulator.overwriteContents(ALU.inverse(GPR[this.registerA].readContents()));
+                        break;
+
+                    //AND
+                    case ALU.Opcodes.AND:
+                        accumulator.overwriteContents(ALU.and(GPR[this.registerA].readContents()));
+                        break;
+
+                    //OR
+                    case ALU.Opcodes.OR:
+                        accumulator.overwriteContents(ALU.or(GPR[this.registerA].readContents()));
+                        break;
+
+                    //XOR
+                    case ALU.Opcodes.XOR:
+                        accumulator.overwriteContents(ALU.xor(GPR[this.registerA].readContents()));
+                        break;
+
+                    //compare
+                    case ALU.Opcodes.COMPARE:
+                        ALU.compare(GPR[this.registerA].readContents());
+                        break;
+
+                    default:
+                        MessageBox.Show("Invalid opcode");
+                        break;
+                }
+
+                //compare should only output flags
+                if (opcodeAsString != ALU.Opcodes.COMPARE)
+                {
+                    //copy accumulator into register B
+                    GPR[this.registerB].overwriteContents(accumulator.readContents());
+                    AccessGPR?.Invoke(GPR[this.registerB].getContents(), this.registerB, Globals.REGISTER_WRITE);
+                    Thread.Sleep(Globals.CLOCK_SPEED);
+                    TurnOffSetEnableBits?.Invoke();
+                    if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+                }
             }
 
             else
@@ -1253,12 +1351,15 @@ namespace CPU_Simulator
                         break;
 
                     case "0101":
-                        //combine reg a and b codes as they correspond to flags
-                        bool[] cat = new bool[Globals.NO_OF_FLAGS];
-                        registerA.CopyTo(cat, Globals.REGISTER_CODE_LENGTH);
-                        registerB.CopyTo(cat, 0);
+                        //register addresses correspond to flags
+                        //recombine them
+                        bool[] combined = new bool[Globals.FLAG_COUNT];
 
-                        BitArray condition = new BitArray(cat);
+                        registerA.CopyTo(combined, Globals.REGISTER_ADDRESS_SIZE);
+                        registerB.CopyTo(combined, 0);
+
+                        BitArray condition = new BitArray(combined);
+
                         jumpIf(condition);
                         break;
 
@@ -1267,7 +1368,7 @@ namespace CPU_Simulator
                         break;
 
                     case "0111":
-                        //i/o
+                        //IO
                         break;
                 }
             }
@@ -1277,22 +1378,33 @@ namespace CPU_Simulator
         private void load()
         {
             //load address in register A to MAR
+            AccessGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
             MAR.overwriteContents(GPR[registerA].readContents());
+            TurnOffSetEnableBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
             //save the data in RAM to register B
             GPR[registerB].overwriteContents(MAR.readFromMemory());
-            WriteToGPR?.Invoke(GPR[registerB].readContents(), registerB);
-            Thread.Sleep(Globals.clockspeed);
+            AccessGPR?.Invoke(GPR[registerB].getContents(), registerB, Globals.REGISTER_WRITE);
+            Thread.Sleep(Globals.CLOCK_SPEED);
+            TurnOffSetEnableBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
 
         //copy data from register to RAM
         private void store()
         {
             //load address in register A to MAR
+            AccessGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
             MAR.overwriteContents(GPR[registerA].readContents());
+            TurnOffSetEnableBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
             //save the data in register B to RAM
+            AccessGPR?.Invoke(GPR[registerB].getContents(), registerB, Globals.REGISTER_READ);
             MAR.writeToMemory(GPR[registerB].readContents());
+            TurnOffSetEnableBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
 
         //copy data from RAM to register (next RAM location)
@@ -1300,42 +1412,62 @@ namespace CPU_Simulator
         {
             //prepares next RAM location for access
             MAR.overwriteContents(IAR.readContents());
+            TurnOffSetEnableBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
             //IAR steps over data to next instruction
             incrementIAR();
 
             //copy data to register B
             GPR[registerB].overwriteContents(MAR.readFromMemory());
-            WriteToGPR?.Invoke(GPR[registerB].readContents(), registerB);
-            Thread.Sleep(Globals.clockspeed);
+            AccessGPR?.Invoke(GPR[registerB].getContents(), registerB, Globals.REGISTER_WRITE);
+            Thread.Sleep(Globals.CLOCK_SPEED);
+            TurnOffSetEnableBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
 
         //jump to address stored in register B
-        private void jumpRegister() { IAR.overwriteContents(GPR[registerB].readContents()); }
+        private void jumpRegister()
+        {
+            AccessGPR?.Invoke(GPR[registerB].getContents(), registerB, Globals.REGISTER_READ);
+            IAR.overwriteContents(GPR[registerB].readContents());
+            TurnOffSetEnableBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+        }
 
         //jump to address thats in the next RAM location
         private void jump()
         {
             MAR.overwriteContents(IAR.readContents());
+            TurnOffSetEnableBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+
             IAR.overwriteContents(MAR.readFromMemory());
+            TurnOffSetEnableBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
 
         //jumps to an address in next RAM location if condition is met
         private void jumpIf(BitArray condition)
         {
-            if (condition.Length == Globals.NO_OF_FLAGS)
+            if (condition.Length == Globals.FLAG_COUNT)
             {
                 bool conditionmet = true;
 
                 //check provided flags are all on
-                for (int count = 0; count < Globals.NO_OF_FLAGS && conditionmet; count++)
+                for (int count = 0; count < Globals.FLAG_COUNT && conditionmet; count++)
                     if (condition[count] && !ALU.flags[count]) conditionmet = false;
 
                 //flags on, jump to address
                 if (conditionmet)
                 {
                     MAR.overwriteContents(IAR.readContents());
+                    TurnOffSetEnableBits?.Invoke();
+                    if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+
                     IAR.overwriteContents(MAR.readFromMemory());
+                    TurnOffSetEnableBits?.Invoke();
+                    if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
                 }
 
                 //skip jump address
@@ -1345,6 +1477,7 @@ namespace CPU_Simulator
             else MessageBox.Show("Invalid condition");
         }
 
-        private void resetFlags() { for (int count = 0; count < Globals.NO_OF_FLAGS; count++) ALU.flags[count] = false; }
+        private void resetFlags() { for (int count = 0; count < Globals.FLAG_COUNT; count++) ALU.flags[count] = false; }
+        //-------------------------------------
     }
 }
