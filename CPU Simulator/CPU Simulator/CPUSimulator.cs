@@ -1,12 +1,7 @@
 ﻿using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Drawing;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Threading;
 
@@ -1042,8 +1037,11 @@ namespace CPU_Simulator
             else if (CPUThread.ThreadState == ThreadState.Aborted)
             {
                 //reset GUI and CPU state
-                resetColours();
+                resetCPU();
                 CU.reset();
+
+                Thread.Sleep(Globals.CLOCK_SPEED);
+                resetColours();
 
                 //start new thread
                 CPUThread = new Thread(new ThreadStart(CU.start));
@@ -1055,8 +1053,11 @@ namespace CPU_Simulator
             else if (CPUThread.ThreadState == ThreadState.Stopped)
             {
                 //reset GUI and CPU state
-                resetColours();
+                resetCPU();
                 CU.reset();
+
+                Thread.Sleep(Globals.CLOCK_SPEED);
+                resetColours();
 
                 //start new thread
                 CPUThread = new Thread(new ThreadStart(CU.start));
@@ -1133,12 +1134,12 @@ namespace CPU_Simulator
 
         private void btnLoadCode_Click(object sender, EventArgs e)
         {
-
+            //todo
         }
 
         private void btnSaveCode_Click(object sender, EventArgs e)
         {
-
+            //todo
         }
         //-------------------------------------
 
@@ -1169,19 +1170,16 @@ namespace CPU_Simulator
 
 
             //instructions
-            BitArray data = new BitArray(new bool[] { false, true, false, false, false, true, false, false });
-            BitArray value = new BitArray(new bool[] { true, true, false, false, false, false, false, false });
-            BitArray dataB = new BitArray(new bool[] { true, false, false, false, false, true, false, false });
-            BitArray valueB = new BitArray(new bool[] { false, true, false, false, false, false, false, false });
-            BitArray compare = new BitArray(new bool[] { true, false, false, true, true, true, true, true });
-            BitArray jumpIf = new BitArray(new bool[] { false, true, false, true, true, false, true, false });
-            BitArray nextAddr = new BitArray(new bool[] { false, false, false, true, false, false, false, false });
-            BitArray skip = new BitArray(new bool[] { false, true, false, false, false, true, false, false });
-            BitArray dataC = new BitArray(new bool[] { true, true, false, false, false, true, false, false });
-            BitArray valueC = new BitArray(new bool[] { true, false, false, false, false, false, false, false });
+            BitArray dataIntoReg1 = new BitArray(new bool[] { false, false, false, false, false, true,  false, false });
+            BitArray inputA       = new BitArray(new bool[] { true,  false,  true, false, false, false, false, false });
+
+            BitArray dataIntoReg2 = new BitArray(new bool[] { false, true,  false, false, false, true,  false, false });
+            BitArray inputB       = new BitArray(new bool[] { true,  true,   true,  true,  true, true,  true,  true  });
+
+            BitArray add          = new BitArray(new bool[] { false, true,  false, false, false, false, false, true  });
 
             //set instructions to load
-            BitArray[] instructions = new BitArray[] { data, value, dataB, valueB, compare, jumpIf, nextAddr, skip, dataC, valueC };
+            BitArray[] instructions = new BitArray[] { dataIntoReg1, inputA, dataIntoReg2, inputB, add };
 
             //link GUI events to CPU registers
             CU = new ControlUnit(instructions, accessRAMLocation,
@@ -1713,11 +1711,68 @@ namespace CPU_Simulator
                 for (int count = 0; count < Globals.GPR_COUNT; count++)
                 {
                     lblGPRContents[count].ForeColor = Color.Black;
+                    pnlGPR[count].Refresh();
                 }
+
+                pnlIR.Refresh();
+                pnlIAR.Refresh();
+                pnlMAR.Refresh();
+                pnlRAM.Refresh();
+                pnlTMP.Refresh();
+                pnlAccumulator.Refresh();
+                pnlFlags.Refresh();
 
                 drawControlBits();
                 drawBus();
             }
+        }
+        
+        public void resetCPU()
+        {
+            lblIRContents.Text = "00000000";
+            lblIRContents.ForeColor = Color.Red;
+
+            lblIARContents.Text = "00000000";
+            lblIARContents.ForeColor = Color.Red;
+
+            lblMARContents.Text = "00000000";
+            lblMARContents.ForeColor = Color.Red;
+
+            lblRAMContents.Text = "00000000";
+            lblRAMContents.ForeColor = Color.Red;
+
+            lblTMPContents.Text = "00000000";
+            lblTMPContents.ForeColor = Color.Red;
+
+            lblAccumulatorContents.Text = "00000000";
+            lblAccumulatorContents.ForeColor = Color.Red;
+
+            lblCoutContents.ForeColor = Color.Red;
+            lblCoutContents.Text = "0";
+
+            lblALargerContents.ForeColor = Color.Red;
+            lblALargerContents.Text = "0";
+
+            lblEqualContents.ForeColor = Color.Red;
+            lblEqualContents.Text = "0";
+
+            lblZeroContents.ForeColor = Color.Red;
+            lblZeroContents.Text = "0";
+
+            for (int count = 0; count < Globals.GPR_COUNT; count++)
+            {
+                lblGPRContents[count].Text = "00000000";
+                lblGPRContents[count].ForeColor = Color.Red;
+                pnlGPR[count].Refresh();
+            }
+
+            pnlIR.Refresh();
+            pnlIAR.Refresh();
+            pnlMAR.Refresh();
+            pnlRAM.Refresh();
+            pnlTMP.Refresh();
+            pnlAccumulator.Refresh();
+            pnlFlags.Refresh();
         }
         //-------------------------------------
     }
@@ -1804,6 +1859,7 @@ namespace CPU_Simulator
 
         //access contents of a register without running GUI events
         public BitArray getContents() { return contents; }
+        public void resetContents() { contents = new BitArray(new byte[] { 0 }); }
 
         public void overwriteContents(BitArray contents)
         {
@@ -1883,8 +1939,6 @@ namespace CPU_Simulator
         //access MAR contents to locate memory address and read/write at the location
         public void writeToMemory(BitArray data) { RAM.writeToLocation(this.getContents(), data); }
         public BitArray readFromMemory() { return RAM.readFromLocation(this.getContents()); }
-
-        public void resetAddress() { RAM.writeToLocation(new BitArray(new byte[] { 0 }), new BitArray(new byte[] { 0 })); }
     }
 
     public class ALU
@@ -2145,24 +2199,17 @@ namespace CPU_Simulator
 
                 //reset values of registers
                 //-------------------------------------
-                MAR.overwriteContents(new BitArray(new byte[] { 0 }));
-                MAR.resetAddress();
-                IAR.overwriteContents(new BitArray(new byte[] { 0 }));
-                IR.overwriteContents(new BitArray(new byte[] { 0 }));
-                accumulator.overwriteContents(new BitArray(new byte[] { 0 }));
-                ALU.TMP.overwriteContents(new BitArray(new byte[] { 0 }));
+                MAR.resetContents();
+                IAR.resetContents();
+                IR.resetContents();
+                accumulator.resetContents();
+                ALU.TMP.resetContents();
 
                 for (int count = 0; count < Globals.GPR_COUNT; count++)
-                {
-                    AccessGPR?.Invoke(new BitArray(new byte[] { 0 }), count, Globals.REGISTER_WRITE);
-                    Thread.Sleep(Globals.CLOCK_SPEED);
-                    GPR[count].overwriteContents(new BitArray(new byte[] { 0 }));
-                }
+                    GPR[count].resetContents();
 
-                resetFlags();
-
-                TurnOffSetEnableBits?.Invoke();
-                Thread.Sleep(Globals.CLOCK_SPEED);
+                //reset flags without invoking GUI event
+                for (int count = 0; count < Globals.FLAG_COUNT; count++) ALU.flags[count] = false;
                 //-------------------------------------
             }
 
