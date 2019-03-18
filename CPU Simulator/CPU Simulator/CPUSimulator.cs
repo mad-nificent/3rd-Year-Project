@@ -7,12 +7,14 @@ using System.Threading;
 
 namespace CPU_Simulator
 {
-    public delegate void ReadOnlyRegister();                                    //BUS1
-    public delegate void ReadWriteRegister(BitArray data, bool read);           //IR, IAR, MAR, TMP etc.
-    public delegate void ReadWriteMemory(BitArray data, int index, bool read);  //require an address (i.e. RAM, GPRs etc.)
-    public delegate void ReadWriteFlags(bool read, int flag = -1);
+    public delegate void ReadOnlyRegister();                                            //BUS1
+    public delegate void ReadWriteRegister(BitArray data, bool accessMode);             //IR, IAR, MAR, TMP etc.
+    public delegate void ReadWriteMemory(BitArray data, int index, bool accessMode);    //require an address (i.e. RAM, GPRs)
+    public delegate void ReadWriteFlags(bool accessMode, int flag = -1);
     public delegate void ALUOperation(BitArray opcode);                     
-    public delegate void RedrawGUI();                                           //redraw before next step
+    public delegate void RedrawGUI();                                                   //redraw before next step
+
+    public delegate void ReadWriteStack(bool accessMode, int stackIndex);
 
     public partial class MainForm : Form
     {
@@ -25,6 +27,7 @@ namespace CPU_Simulator
         private bool UIDrawn = false;
         private bool registerScreenDrawn = false;
         private bool stackScreenDrawn = false;
+        private bool registerSelected = false;
 
         //welcome screen
         private Label lblWelcome = new Label();
@@ -60,9 +63,16 @@ namespace CPU_Simulator
         private Label lblIR = new Label();
         private Label lblIRContents = new Label();
 
+        //GPRs and stack
+        //------------------------------------------------------------   
         private Panel[] pnlGPR = new Panel[Globals.NO_OF_GPR];
         private Label[] lblGPR = new Label[Globals.NO_OF_GPR];
         private Label[] lblGPRContents = new Label[Globals.NO_OF_GPR];
+
+        private Panel pnlStack = new Panel();
+        private Label[] lblStack = new Label[Globals.STACK_SIZE];
+        private Label[] lblStackContents = new Label[Globals.STACK_SIZE];
+        //------------------------------------------------------------
 
         private Panel pnlMAR = new Panel();
         private Label lblMAR = new Label();
@@ -111,6 +121,7 @@ namespace CPU_Simulator
         private void showWelcomeScreen()
         {
             ClientSize = new Size(230, 140);
+
             Text = "Welcome!";
 
             //object properties already calculated, just add back to the form (faster draw speed)
@@ -316,10 +327,109 @@ namespace CPU_Simulator
             Controls.Remove(btnSaveCode);
         }
 
-        private void drawComponents()
+        private void drawRegisterCPU()
+        {
+            drawBus();
+            drawRegisterCircuit();
+            drawComponents(registerScreenDrawn);
+
+            lblTMP.Text = "TMP";
+
+            //GPRs already created, just add back to the form (faster draw speed)
+            if (registerScreenDrawn)
+            {
+                for (int count = 0; count < Globals.NO_OF_GPR; count++)
+                    Controls.Add(pnlGPR[count]);
+            }
+
+            //create and add GPRs to the form
+            else
+            {
+                registerScreenDrawn = true;
+
+                for (int count = 0, yPos = 160; count < Globals.NO_OF_GPR; count++, yPos += 60)
+                {
+                    pnlGPR[count] = new Panel();
+                    pnlGPR[count].BorderStyle = BorderStyle.FixedSingle;
+                    pnlGPR[count].Location = new Point(655, yPos);
+                    pnlGPR[count].Size = new Size(80, 50);
+
+                    Controls.Add(pnlGPR[count]);
+
+                    lblGPR[count] = new Label();
+                    lblGPR[count].Text = "RG" + (count + 1).ToString();
+                    lblGPR[count].Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                    lblGPR[count].TextAlign = ContentAlignment.MiddleCenter;
+                    lblGPR[count].Location = new Point(20, 4);
+                    lblGPR[count].Size = new Size(41, 20);
+
+                    pnlGPR[count].Controls.Add(lblGPR[count]);
+
+                    lblGPRContents[count] = new Label();
+                    lblGPRContents[count].Text = "00000000";
+                    lblGPRContents[count].TextAlign = ContentAlignment.MiddleCenter;
+                    lblGPRContents[count].BorderStyle = BorderStyle.FixedSingle;
+                    lblGPRContents[count].Location = new Point(10, 26);
+                    lblGPRContents[count].Size = new Size(60, 20);
+
+                    pnlGPR[count].Controls.Add(lblGPRContents[count]);
+                }
+            }
+
+        }
+
+        private void drawStackCPU()
+        {
+            drawBus();
+            drawStackCircuit();
+            drawComponents(stackScreenDrawn);
+
+            lblTMP.Text = "TOS";
+
+            //stack already created, just add back to the form (faster draw speed)
+            if (stackScreenDrawn)
+            {
+                Controls.Add(pnlStack);
+            }
+
+            //create and add stack to the form
+            else
+            {
+                stackScreenDrawn = true;
+
+                pnlStack.BorderStyle = BorderStyle.FixedSingle;
+                pnlStack.Location = new Point(645, 170);
+                pnlStack.Size = new Size(95, 210);
+
+                Controls.Add(pnlStack);
+
+                for (int count = 0, yPos = 5; count < Globals.STACK_SIZE; count++, yPos += 25)
+                {
+                    lblStack[count] = new Label();
+                    lblStack[count].Text = count.ToString();
+                    lblStack[count].TextAlign = ContentAlignment.MiddleCenter;
+                    lblStack[count].BorderStyle = BorderStyle.FixedSingle;
+                    lblStack[count].Location = new Point(5, yPos);
+                    lblStack[count].Size = new Size(20, 20);
+
+                    pnlStack.Controls.Add(lblStack[count]);
+
+                    lblStackContents[count] = new Label();
+                    lblStackContents[count].Text = "00000000";
+                    lblStackContents[count].TextAlign = ContentAlignment.MiddleCenter;
+                    lblStackContents[count].BorderStyle = BorderStyle.FixedSingle;
+                    lblStackContents[count].Location = new Point(30, yPos);
+                    lblStackContents[count].Size = new Size(60, 20);
+
+                    pnlStack.Controls.Add(lblStackContents[count]);
+                }
+            }
+        }
+
+        private void drawComponents(bool screenDrawn)
         {
             //object properties already calculated, just add back to the form (faster draw speed)
-            if (registerScreenDrawn)
+            if (screenDrawn)
             {
                 Controls.Add(pnlControlUnit);
                 Controls.Add(pnlIAR);
@@ -331,9 +441,6 @@ namespace CPU_Simulator
                 Controls.Add(pnlRAM);
                 Controls.Add(pnlMAR);
                 Controls.Add(pnlFlags);
-
-                for (int count = 0; count < Globals.NO_OF_GPR; count++)
-                    Controls.Add(pnlGPR[count]);
             }
 
             else
@@ -410,120 +517,6 @@ namespace CPU_Simulator
                 lblIRContents.Size = new Size(60, 20);
 
                 pnlIR.Controls.Add(lblIRContents);
-                //--------------------------------------------
-
-                //GPR registers
-                //--------------------------------------------
-                for (int count = 0; count < Globals.NO_OF_GPR; count++)
-                {
-                    pnlGPR[count] = new Panel();
-                    lblGPR[count] = new Label();
-                    lblGPRContents[count] = new Label();
-                }
-
-                //GPR 1
-                //--------------------------------------------
-                pnlGPR[0].BorderStyle = BorderStyle.FixedSingle;
-                pnlGPR[0].Location = new Point(655, 160);
-                pnlGPR[0].Size = new Size(80, 50);
-
-                Controls.Add(pnlGPR[0]);
-
-                //labelling GPR
-                lblGPR[0].Text = "RG1";
-                lblGPR[0].Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblGPR[0].TextAlign = ContentAlignment.MiddleCenter;
-                lblGPR[0].Location = new Point(20, 4);
-                lblGPR[0].Size = new Size(41, 20);
-
-                pnlGPR[0].Controls.Add(lblGPR[0]);
-
-                //contents of GPR
-                lblGPRContents[0].Text = "00000000";
-                lblGPRContents[0].TextAlign = ContentAlignment.MiddleCenter;
-                lblGPRContents[0].BorderStyle = BorderStyle.FixedSingle;
-                lblGPRContents[0].Location = new Point(10, 26);
-                lblGPRContents[0].Size = new Size(60, 20);
-
-                pnlGPR[0].Controls.Add(lblGPRContents[0]);
-
-                //GPR 2
-                //--------------------------------------------
-                pnlGPR[1].BorderStyle = BorderStyle.FixedSingle;
-                pnlGPR[1].Location = new Point(655, 220);
-                pnlGPR[1].Size = new Size(80, 50);
-
-                Controls.Add(pnlGPR[1]);
-
-                //labelling GPR
-                lblGPR[1].Text = "RG2";
-                lblGPR[1].Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblGPR[1].TextAlign = ContentAlignment.MiddleCenter;
-                lblGPR[1].Location = new Point(20, 4);
-                lblGPR[1].Size = new Size(41, 20);
-
-                pnlGPR[1].Controls.Add(lblGPR[1]);
-
-                //contents of GPR
-                lblGPRContents[1].Text = "00000000";
-                lblGPRContents[1].TextAlign = ContentAlignment.MiddleCenter;
-                lblGPRContents[1].BorderStyle = BorderStyle.FixedSingle;
-                lblGPRContents[1].Location = new Point(10, 26);
-                lblGPRContents[1].Size = new Size(60, 20);
-
-                pnlGPR[1].Controls.Add(lblGPRContents[1]);
-
-                //GPR 3
-                //--------------------------------------------
-                pnlGPR[2].BorderStyle = BorderStyle.FixedSingle;
-                pnlGPR[2].Location = new Point(655, 280);
-                pnlGPR[2].Size = new Size(80, 50);
-
-                Controls.Add(pnlGPR[2]);
-
-                //labelling GPR
-                lblGPR[2].Text = "RG3";
-                lblGPR[2].Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblGPR[2].TextAlign = ContentAlignment.MiddleCenter;
-                lblGPR[2].Location = new Point(20, 4);
-                lblGPR[2].Size = new Size(41, 20);
-
-                pnlGPR[2].Controls.Add(lblGPR[2]);
-
-                //contents of GPR
-                lblGPRContents[2].Text = "00000000";
-                lblGPRContents[2].TextAlign = ContentAlignment.MiddleCenter;
-                lblGPRContents[2].BorderStyle = BorderStyle.FixedSingle;
-                lblGPRContents[2].Location = new Point(10, 26);
-                lblGPRContents[2].Size = new Size(60, 20);
-
-                pnlGPR[2].Controls.Add(lblGPRContents[2]);
-
-                //GPR 4
-                //--------------------------------------------
-                pnlGPR[3].BorderStyle = BorderStyle.FixedSingle;
-                pnlGPR[3].Location = new Point(655, 340);
-                pnlGPR[3].Size = new Size(80, 50);
-
-                Controls.Add(pnlGPR[3]);
-
-                //labelling GPR
-                lblGPR[3].Text = "RG4";
-                lblGPR[3].Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblGPR[3].TextAlign = ContentAlignment.MiddleCenter;
-                lblGPR[3].Location = new Point(20, 4);
-                lblGPR[3].Size = new Size(41, 20);
-
-                pnlGPR[3].Controls.Add(lblGPR[3]);
-
-                //contents of GPR
-                lblGPRContents[3].Text = "00000000";
-                lblGPRContents[3].TextAlign = ContentAlignment.MiddleCenter;
-                lblGPRContents[3].BorderStyle = BorderStyle.FixedSingle;
-                lblGPRContents[3].Location = new Point(10, 26);
-                lblGPRContents[3].Size = new Size(60, 20);
-
-                pnlGPR[3].Controls.Add(lblGPRContents[3]);
                 //--------------------------------------------
 
                 //MAR
@@ -703,7 +696,6 @@ namespace CPU_Simulator
                 Controls.Add(pnlTMP);
 
                 //labelling temp
-                lblTMP.Text = "TMP";
                 lblTMP.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
                 lblTMP.TextAlign = ContentAlignment.MiddleCenter;
                 lblTMP.Location = new Point(20, 4);
@@ -766,9 +758,21 @@ namespace CPU_Simulator
 
                 pnlAcc.Controls.Add(lblAccContents);
                 //--------------------------------------------
-
-                registerScreenDrawn = true;
             }
+        }
+
+        private void hideRegisterCPU()
+        {
+            hideComponents();
+
+            for (int count = 0; count < Globals.NO_OF_GPR; count++)
+                Controls.Remove(pnlGPR[count]);
+        }
+
+        private void hideStackCPU()
+        {
+            hideComponents();
+            Controls.Remove(pnlStack);
         }
 
         private void hideComponents()
@@ -783,9 +787,49 @@ namespace CPU_Simulator
             Controls.Remove(pnlRAM);
             Controls.Remove(pnlMAR);
             Controls.Remove(pnlFlags);
+        }
 
-            for (int count = 0; count < Globals.NO_OF_GPR; count++)
-                Controls.Remove(pnlGPR[count]);
+        private void drawRegisterCircuit()
+        {
+            Graphics circuit = CreateGraphics();
+            Pen controlWire = new Pen(Color.Black);
+            controlWire.Width = 2;
+
+            //GPR1
+            circuit.DrawLine(controlWire, 655, 190, 625, 190);  //enable
+            circuit.DrawLine(controlWire, 655, 185, 625, 185);  //set
+
+            //GPR2
+            circuit.DrawLine(controlWire, 655, 250, 625, 250);  //enable
+            circuit.DrawLine(controlWire, 655, 245, 625, 245);  //set
+
+            //GPR3
+            circuit.DrawLine(controlWire, 655, 315, 625, 315);  //enable
+            circuit.DrawLine(controlWire, 655, 310, 625, 310);  //set
+
+            //GPR4
+            circuit.DrawLine(controlWire, 655, 365, 625, 365);  //enable
+            circuit.DrawLine(controlWire, 655, 360, 625, 360);  //set
+
+            controlWire.Dispose();
+            circuit.Dispose();
+
+            drawControlBits();
+        }
+
+        private void drawStackCircuit()
+        {
+            Graphics circuit = CreateGraphics();
+            Pen controlWire = new Pen(Color.Black);
+            controlWire.Width = 2;
+
+            circuit.DrawLine(controlWire, 655, 190, 625, 190);  //enable
+            circuit.DrawLine(controlWire, 655, 185, 625, 185);  //set
+
+            controlWire.Dispose();
+            circuit.Dispose();
+
+            drawControlBits();
         }
 
         private void drawControlBits()
@@ -815,22 +859,6 @@ namespace CPU_Simulator
             circuit.DrawLine(controlWire, 506, 395, 506, 375);  //opcode 8
 
             circuit.DrawLine(controlWire, 530, 395, 530, 375);  //set
-
-            //GPR1
-            circuit.DrawLine(controlWire, 655, 190, 625, 190);  //enable
-            circuit.DrawLine(controlWire, 655, 185, 625, 185);  //set
-
-            //GPR2
-            circuit.DrawLine(controlWire, 655, 250, 625, 250);  //enable
-            circuit.DrawLine(controlWire, 655, 245, 625, 245);  //set
-
-            //GPR3
-            circuit.DrawLine(controlWire, 655, 315, 625, 315);  //enable
-            circuit.DrawLine(controlWire, 655, 310, 625, 310);  //set
-
-            //GPR4
-            circuit.DrawLine(controlWire, 655, 365, 625, 365);  //enable
-            circuit.DrawLine(controlWire, 655, 360, 625, 360);  //set
 
             //MAR
             circuit.DrawLine(controlWire, 430, 60, 430, 175);   //enable
@@ -958,21 +986,24 @@ namespace CPU_Simulator
             circuit.DrawLine(bus, 447.5f, 422.5f, 470, 422.5f);
             circuit.DrawLine(bus, 447.5f, 427.5f, 470, 427.5f);
 
-            //GPR1
+            //GPR1/Stack
             circuit.DrawLine(bus, 735, 182.5f, 760, 182.5f);
             circuit.DrawLine(bus, 735, 187.5f, 760, 187.5f);
 
-            //GPR2
-            circuit.DrawLine(bus, 735, 242.5f, 760, 242.5f);
-            circuit.DrawLine(bus, 735, 247.5f, 760, 247.5f);
+            if (registerSelected)
+            {
+                //GPR2
+                circuit.DrawLine(bus, 735, 242.5f, 760, 242.5f);
+                circuit.DrawLine(bus, 735, 247.5f, 760, 247.5f);
 
-            //GPR3
-            circuit.DrawLine(bus, 735, 302.5f, 760, 302.5f);
-            circuit.DrawLine(bus, 735, 307.5f, 760, 307.5f);
+                //GPR3
+                circuit.DrawLine(bus, 735, 302.5f, 760, 302.5f);
+                circuit.DrawLine(bus, 735, 307.5f, 760, 307.5f);
 
-            //GPR4
-            circuit.DrawLine(bus, 735, 362.5f, 760, 362.5f);
-            circuit.DrawLine(bus, 735, 367.5f, 760, 367.5f);
+                //GPR4
+                circuit.DrawLine(bus, 735, 362.5f, 760, 362.5f);
+                circuit.DrawLine(bus, 735, 367.5f, 760, 367.5f);
+            }
 
             circuit.Dispose();
             bus.Dispose();
@@ -986,11 +1017,10 @@ namespace CPU_Simulator
             ClientSize = new Size(1137, 489);
             Text = "Register CPU Simulator";
 
-            hideWelcomeScreen();
+            registerSelected = true;
 
-            drawComponents();
-            drawControlBits();
-            drawBus();
+            hideWelcomeScreen();
+            drawRegisterCPU();
             drawUI();
 
             loadRegisterCPU();
@@ -1001,14 +1031,13 @@ namespace CPU_Simulator
             ClientSize = new Size(1137, 489);
             Text = "Stack CPU Simulator";
 
-            hideWelcomeScreen();
+            registerSelected = false;
 
-            //drawComponents();
-            //drawControlBits();
-            //drawBus();
-            //drawUI();
-            //
-            //loadRegisterCPU();
+            hideWelcomeScreen();
+            drawStackCPU();
+            drawUI();
+
+            loadStackCPU();
         }
 
         private void btnStart_Click(object sender, EventArgs e)
@@ -1111,14 +1140,23 @@ namespace CPU_Simulator
                 if (CPUThread.ThreadState == ThreadState.Running ||
                     CPUThread.ThreadState == ThreadState.WaitSleepJoin)
                 {
-                    CPUThread.Suspend();
+                    CPUThread.Abort();
+                }
+
+                //cannot abort suspended thread
+                else if (CPUThread.ThreadState == ThreadState.Suspended)
+                {
+                    CPUThread.Resume();
+                    CPUThread.Abort();
                 }
             }
 
             hideUI();
-            hideComponents();
-            Invalidate();
 
+            if (registerSelected) hideRegisterCPU();
+            else hideStackCPU();
+
+            Invalidate();
             showWelcomeScreen();
         }
 
@@ -1216,7 +1254,65 @@ namespace CPU_Simulator
 
         private void loadStackCPU()
         {
-            //todo
+            //-------------------------------------------------------------------------------------------------------------
+            //                                                        opcode            |             BLANK
+            //--------------------------------------------------------------------------|---------------|------------------
+            //BitArray pop*     = new BitArray(new bool[] { false, false, false, false, | false, false, | false, false });
+            //BitArray swap     = new BitArray(new bool[] { false, false, false, true,  | false, false, | false, false });
+            //BitArray push*    = new BitArray(new bool[] { false, false, true,  false, | false, false, | false, false });
+            //BitArray jumpTOS  = new BitArray(new bool[] { false, false, true,  true,  | false, false, | false, false });
+            //BitArray jump*    = new BitArray(new bool[] { false, true,  false, false, | false, false, | false, false });
+            //--------------------------------------------------------------------------|---------------------------------
+            //                                                        opcode            |   0   |  A >  |   =   | COUT
+            //BitArray jumpIf * = new BitArray(new bool[] { false, true,  false, true,  | false, false, | false, false });
+            //--------------------------------------------------------------------------|---------------------------------
+            //BitArray resetFlg = new BitArray(new bool[] { false, true,  true,  false, | false, false, | false, false });
+            //BitArray IO       = new BitArray(new bool[] { false, true,  true,  true,  | false, false, | false, false });
+            //--------------------------------------------------------------------------|---------------|-----------------
+            //* INDICATES ADDRESS/DATA SHOULD BE PROVIDED AT NEXT INSTRUCTION ADDRESS
+            //--------------------------------------------------------------------------|---------------|-----------------
+            //BitArray add      = new BitArray(new bool[] { true,  false, false, false, | false, false, | false, false });
+            //BitArray rShift   = new BitArray(new bool[] { true,  false, false, true,  | false, false, | false, false });
+            //BitArray lShift   = new BitArray(new bool[] { true,  false, true,  false, | false, false, | false, false });
+            //BitArray not      = new BitArray(new bool[] { true,  false, true,  true,  | false, false, | false, false });
+            //BitArray and      = new BitArray(new bool[] { true,  true,  false, false, | false, false, | false, false });
+            //BitArray or       = new BitArray(new bool[] { true,  true,  false, true,  | false, false, | false, false });
+            //BitArray xor      = new BitArray(new bool[] { true,  true,  true,  false, | false, false, | false, false });
+            //BitArray compare  = new BitArray(new bool[] { true,  true,  true,  true,  | false, false, | false, false });
+            //-------------------------------------------------------------------------------------------------------------
+
+            //instructions, template above
+            BitArray push = new BitArray(new bool[] { false, false, true, false, false, false, false, false });
+            BitArray inputA = new BitArray(new bool[] { true, false, true, false, true, false, true, false });
+            BitArray inputB = new BitArray(new bool[] { true, true, true, true, true, true, true, true });
+            BitArray inputC = new BitArray(new bool[] { true, true, true, true, false, false, false, false });
+            BitArray inputD = new BitArray(new bool[] { false, false, false, false, true, true, true, true });
+            BitArray pop = new BitArray(new bool[] { false, false, false, false, false, false, false, false });
+            BitArray address = new BitArray(new bool[] { false, false, false, false, true, false, true, true });
+            BitArray swap = new BitArray(new bool[] { false, false, false, true, false, false, false, false });
+
+            //reverse the bit arrays
+            push = Globals.reverseBitArray(push);
+            inputA = Globals.reverseBitArray(inputA);
+            inputB = Globals.reverseBitArray(inputB);
+            inputC = Globals.reverseBitArray(inputC);
+            inputD = Globals.reverseBitArray(inputD);
+            pop = Globals.reverseBitArray(pop);
+            address = Globals.reverseBitArray(address);
+            swap = Globals.reverseBitArray(swap);
+
+            //index of last instruction
+            byte[] lastAddress = { 10 };
+
+            //set instructions to load
+            BitArray[] instructions = new BitArray[] { push, inputA, push, inputB, push, inputC, push, inputD, pop, address, swap };
+
+            //create CPU and link methods to respond to events
+            CU = new ControlUnit(instructions, accessRAMLocation, lastAddress, 
+                pushPopStack, accessStack,
+                updateIARContents, updateIRContents, updateMARContents,
+                updateTMPContents, readBUS1, accessALU, updateAccumulatorContents,
+                updateFlagRegister, resetColours);
         }
 
         //PUBLIC
@@ -1404,7 +1500,7 @@ namespace CPU_Simulator
                     circuit.DrawLine(controlWire, 320, 80, 320, 175);
 
                     lblTMPContents.Text = Globals.convertBitsToString(data);    //data flows into memory (contents changed)
-                    lblTMPContents.ForeColor = Globals.WRITE_COLOR;              //highlight data (visual aid)
+                    lblTMPContents.ForeColor = Globals.WRITE_COLOR;             //highlight data (visual aid)
                     //------------------------------------------------------
 
                     controlWire.Dispose();
@@ -1433,7 +1529,7 @@ namespace CPU_Simulator
                     circuit.DrawLine(controlWire, 285, 410, 285, 375);
 
                     enableBus();                                            //data flows onto the bus
-                    lblAccContents.ForeColor = Globals.READ_COLOR;   //highlight data (visual aid)
+                    lblAccContents.ForeColor = Globals.READ_COLOR;          //highlight data (visual aid)
                     //---------------------------------------------------
 
                     controlWire.Dispose();
@@ -1467,6 +1563,11 @@ namespace CPU_Simulator
 
                 circuit.Dispose();
             }
+        }
+
+        public void readTMPToBus()
+        {
+            //read TMP and enable bus instead of feeding to ALU
         }
 
         public void updateFlagRegister(bool accessMode, int flagIndex = -1)
@@ -1616,12 +1717,12 @@ namespace CPU_Simulator
             }
         }
 
-        public void accessGPRContents(BitArray data, int GPRindex, bool accessMode)
+        public void accessGPRContents(BitArray data, int GPRIndex, bool accessMode)
         {
-            if (InvokeRequired) Invoke(new ReadWriteMemory(accessGPRContents), new object[] { data, GPRindex, accessMode });
+            if (InvokeRequired) Invoke(new ReadWriteMemory(accessGPRContents), new object[] { data, GPRIndex, accessMode });
             else
             {
-                if (GPRindex < Globals.NO_OF_GPR)
+                if (GPRIndex < Globals.NO_OF_GPR)
                 {
                     Graphics circuit = CreateGraphics();
 
@@ -1633,7 +1734,7 @@ namespace CPU_Simulator
                         //read process
                         //--------------------------------------------------------
                         //activate enable wire for selected GPR
-                        switch (GPRindex)
+                        switch (GPRIndex)
                         {
                             case 0:
                                 circuit.DrawLine(controlWire, 655, 190, 625, 190);
@@ -1652,7 +1753,7 @@ namespace CPU_Simulator
                         }
 
                         enableBus();                                                //data flows onto the bus
-                        lblGPRContents[GPRindex].ForeColor = Globals.READ_COLOR;     //highlight data (visual aid)
+                        lblGPRContents[GPRIndex].ForeColor = Globals.READ_COLOR;     //highlight data (visual aid)
                         //--------------------------------------------------------
 
                         controlWire.Dispose();
@@ -1666,7 +1767,7 @@ namespace CPU_Simulator
                         //write process
                         //----------------------------------------------------------------
                         //activate set wire for selected GPR
-                        switch (GPRindex)
+                        switch (GPRIndex)
                         {
                             case 0:
                                 circuit.DrawLine(controlWire, 655, 185, 625, 185);
@@ -1684,8 +1785,8 @@ namespace CPU_Simulator
                                 break;
                         }
                         
-                        lblGPRContents[GPRindex].Text = Globals.convertBitsToString(data);  //data flows into memory (contents changed)
-                        lblGPRContents[GPRindex].ForeColor = Globals.WRITE_COLOR;            //highlight data (visual aid)
+                        lblGPRContents[GPRIndex].Text = Globals.convertBitsToString(data);  //data flows into memory (contents changed)
+                        lblGPRContents[GPRIndex].ForeColor = Globals.WRITE_COLOR;            //highlight data (visual aid)
                         //----------------------------------------------------------------
 
                         controlWire.Dispose();
@@ -1693,6 +1794,134 @@ namespace CPU_Simulator
 
                     circuit.Dispose();
                 }
+            }
+        }
+
+        public void pushPopStack(bool accessMode, int stackIndex)
+        {
+            if (InvokeRequired) Invoke(new ReadWriteStack(pushPopStack), new object[] { accessMode, stackIndex});
+            else
+            {
+                if (stackIndex < Globals.STACK_SIZE)
+                {
+                    Graphics circuit = CreateGraphics();
+
+                    if (accessMode == Globals.REGISTER_READ)
+                    {
+                        //top element, copy into TOS
+                        if (stackIndex == 0)
+                        {
+                            Pen controlWire = new Pen(Globals.READ_COLOR);
+                            controlWire.Width = 2;
+
+                            //read process
+                            //----------------------------------------------------------
+                            circuit.DrawLine(controlWire, 655, 190, 625, 190);              //activate enable wire
+                            lblStackContents[stackIndex].ForeColor = Globals.READ_COLOR;    //highlight data (visual aid)
+                            enableBus();                                                    //data flows onto the bus
+
+                            //write to TOS
+                            updateTMPContents(Globals.convertStringToBits(lblStackContents[stackIndex].Text), Globals.REGISTER_WRITE);
+                            //----------------------------------------------------------
+
+                            controlWire.Dispose();
+                        }
+
+                        else
+                        {
+                            //shift data in current element to element above
+                            lblStackContents[stackIndex].ForeColor = Globals.READ_COLOR;                //highlight data (visual aid)
+                            lblStackContents[stackIndex - 1].Text = lblStackContents[stackIndex].Text;  //shift data up
+                            lblStackContents[stackIndex - 1].ForeColor = Globals.WRITE_COLOR;           //highlight data (visual aid)
+                        }
+                    }
+
+                    else if (accessMode == Globals.REGISTER_WRITE)
+                    {
+                        //copy TOS to top of stack first
+                        if (stackIndex == 0)
+                        {
+                            Pen controlWire = new Pen(Globals.READ_COLOR);
+                            controlWire.Width = 2;
+
+                            //read from TOS
+                            //-----------------------------------------------
+                            //activate enable wire
+                            circuit.DrawLine(controlWire, 160, 75, 325, 75);
+                            circuit.DrawLine(controlWire, 325, 75, 325, 175);
+ 
+                            //highlight data (visual aid)
+                            lblTMPContents.ForeColor = Globals.READ_COLOR;
+
+                            //data flows onto the bus
+                            enableBus();
+                            //-----------------------------------------------
+
+                            controlWire = new Pen(Globals.WRITE_COLOR);
+                            controlWire.Width = 2;
+
+                            //write process
+                            //-----------------------------------------------------------
+                            circuit.DrawLine(controlWire, 655, 185, 625, 185);              //activate set wire
+                            lblStackContents[stackIndex].Text = lblTMPContents.Text;        //copy data from TOS to top of stack
+                            lblStackContents[stackIndex].ForeColor = Globals.WRITE_COLOR;   //highlight data (visual aid)
+                            //-----------------------------------------------------------
+
+                            controlWire.Dispose();
+                        }
+
+                        else
+                        {
+                            //shift data from memory above into current memory
+                            lblStackContents[stackIndex - 1].ForeColor = Globals.READ_COLOR;            //highlight data (visual aid)
+                            lblStackContents[stackIndex].Text = lblStackContents[stackIndex - 1].Text;  //shift data down
+                            lblStackContents[stackIndex].ForeColor = Globals.WRITE_COLOR;               //highlight data (visual aid)
+                        }
+                    }
+
+                    circuit.Dispose();
+                }
+            }
+        }
+
+        public void accessStack(BitArray data, bool accessMode)
+        {
+            if (InvokeRequired) Invoke(new ReadWriteRegister(accessStack), new object[] { data, accessMode });
+            else
+            {
+                Graphics circuit = CreateGraphics();
+
+                if (accessMode == Globals.REGISTER_READ)
+                {
+                    Pen controlWire = new Pen(Globals.READ_COLOR);
+                    controlWire.Width = 2;
+
+                    //read process
+                    //-------------------------------------------------
+                    circuit.DrawLine(controlWire, 655, 190, 625, 190);      //activate enable wire
+                    lblStackContents[0].ForeColor = Globals.READ_COLOR;     //highlight data (visual aid)
+                    enableBus();                                            //data flows onto the bus
+                    //-------------------------------------------------
+
+                    controlWire.Dispose();
+                }
+
+                else if (accessMode == Globals.REGISTER_WRITE && data != null)
+                {
+                    Pen controlWire = new Pen(Globals.WRITE_COLOR);
+                    controlWire.Width = 2;
+
+                    //read process
+                    //-----------------------------------------------------------
+                    circuit.DrawLine(controlWire, 655, 185, 625, 185);              //activate set wire
+                    lblStackContents[0].Text = Globals.convertBitsToString(data);   //copy data to top of stack
+                    lblStackContents[0].ForeColor = Globals.WRITE_COLOR;            //highlight data (visual aid)
+                    //-----------------------------------------------------------
+
+                    controlWire.Dispose();
+                }
+
+                circuit.Dispose();
             }
         }
 
@@ -1766,10 +1995,23 @@ namespace CPU_Simulator
                 lblEqualContents.ForeColor = Color.Black;
                 lblZeroContents.ForeColor = Color.Black;
 
-                for (int count = 0; count < Globals.NO_OF_GPR; count++)
+                if (registerSelected)
                 {
-                    lblGPRContents[count].ForeColor = Color.Black;
-                    pnlGPR[count].Refresh();
+                    for (int count = 0; count < Globals.NO_OF_GPR; count++)
+                    {
+                        lblGPRContents[count].ForeColor = Color.Black;
+                        pnlGPR[count].Refresh();
+                    }
+                }
+
+                else
+                {
+                    for (int count = 0; count < Globals.STACK_SIZE; count++)
+                    {
+                        lblStackContents[count].ForeColor = Color.Black;
+                    }
+
+                    pnlStack.Refresh();
                 }
 
                 pnlIR.Refresh();
@@ -1780,7 +2022,9 @@ namespace CPU_Simulator
                 pnlAcc.Refresh();
                 pnlFlags.Refresh();
 
-                drawControlBits();
+                if (registerSelected) drawRegisterCircuit();
+                else drawStackCircuit();
+
                 drawBus();
             }
         }
@@ -1819,11 +2063,25 @@ namespace CPU_Simulator
             lblZeroContents.ForeColor = Color.Red;
             lblZeroContents.Text = "0";
 
-            for (int count = 0; count < Globals.NO_OF_GPR; count++)
+            if (registerSelected)
             {
-                lblGPRContents[count].Text = "00000000";
-                lblGPRContents[count].ForeColor = Color.Red;
-                pnlGPR[count].Refresh();
+                for (int count = 0; count < Globals.NO_OF_GPR; count++)
+                {
+                    lblGPRContents[count].Text = "00000000";
+                    lblGPRContents[count].ForeColor = Color.Red;
+                    pnlGPR[count].Refresh();
+                }
+            }
+
+            else
+            {
+                for (int count = 0; count < Globals.STACK_SIZE; count++)
+                {
+                    lblStackContents[count].Text = "00000000";
+                    lblStackContents[count].ForeColor = Color.Red;
+                }
+
+                pnlStack.Refresh();
             }
 
             pnlIR.Refresh();
@@ -1851,9 +2109,14 @@ namespace CPU_Simulator
         public const int OPCODE_START = OPCODE_SIZE - 1;    //opcode also big endian
         public const int ALU_OPCODE = OPCODE_START;
 
-        public const string OP_LOAD = "0000", OP_STORE = "0001", OP_DATA = "0010", OP_JUMP_RG = "0011", 
+        public const string 
+                            //stack and register equivalent instructions
+                            OP_LOAD_POP = "0000", OP_STORE_SWAP = "0001", OP_DATA_PUSH = "0010", OP_JUMP_RG_TOS = "0011",
+                            
+                            //instructions the same for both
                             OP_JUMP = "0100", OP_JUMP_IF = "0101", OP_RESET_FLAGS = "0110", OP_IO = "0111",
-
+                            
+                            //ALU instructions
                             ALU_ADD = "1000", ALU_R_SHIFT = "1001", ALU_L_SHIFT = "1010", ALU_NOT = "1011", 
                             ALU_AND = "1100", ALU_OR = "1101", ALU_XOR = "1110", ALU_COMPARE = "1111";
 
@@ -1864,6 +2127,7 @@ namespace CPU_Simulator
         //-------------------------------
         public const int RAM_SIZE = 256;
         public const int NO_OF_GPR = 4;
+        public const int STACK_SIZE = 8;
         public const int NO_OF_FLAGS = 4;
         //-------------------------------
 
@@ -1909,6 +2173,17 @@ namespace CPU_Simulator
             return new string(result);
         }
 
+        public static BitArray convertStringToBits(string data)
+        {
+            BitArray result = new BitArray(WORD_SIZE);
+
+            for (int count = 0; count < WORD_SIZE; count++)
+                if (data[count] == '1') result.Set(count, true);
+
+            result = reverseBitArray(result);
+            return result;
+        }
+
         public static byte convertBitsToByte(BitArray data)
         {
             byte[] result = new byte[1];
@@ -1933,7 +2208,11 @@ namespace CPU_Simulator
 
         //access contents without invoking event
         public BitArray getContents() { return contents; }
-        public void resetContents() { contents = new BitArray(new byte[] { 0 }); }
+        public void setContents(BitArray contents = null)
+        {
+            if (contents != null) this.contents = contents;
+            else this.contents = new BitArray(new byte[] { 0 });
+        }
 
         public void overwriteContents(BitArray contents)
         {
@@ -2244,7 +2523,9 @@ namespace CPU_Simulator
     public class ControlUnit
     {
         //PRIVATE
+        private bool registerMachine = false;                               //CPU to simulate (toggle register and stack)
         private bool programFinished = false;                               //stop execution when true
+
         private BitArray opcode = new BitArray(Globals.OPCODE_SIZE);        //instruction to execute
         private BitArray flagCondition = new BitArray(Globals.NO_OF_FLAGS); //parameters for a jump if
         private byte registerA, registerB;                                  //address of GPRs in use by current instruction
@@ -2253,7 +2534,9 @@ namespace CPU_Simulator
 
         private MAR MAR;
         private Register IAR, IR, ACC;
+
         private Register[] GPR = new Register[Globals.NO_OF_GPR];
+        private Register[] stack = new Register[Globals.STACK_SIZE];
 
         //PUBLIC
         public event ReadWriteMemory ReadWriteGPR;      //when invoked, GUI will update GPR with its new data (write), or indicate it is being accessed (read)
@@ -2261,16 +2544,20 @@ namespace CPU_Simulator
         public event ALUOperation RunALUOperation;      //the ALU opcode bits will pass to the ALU opcode wires on the GUI
         public event RedrawGUI ResetControlBits;        //GUI will turn off all control bits (set, enable, opcodes)
 
+        public event ReadWriteStack PushPopStack;       //when invoked, GUI will shift all stack elements up (pop) or down (push)
+
         //tracks the last executable instruction in memory
         public readonly BitArray lastInstruction = new BitArray(Globals.WORD_SIZE);
 
-        //initialise all CPU components
+        //initialise all CPU components for register machine
         public ControlUnit                                                                                                  
             (BitArray[] instructions, ReadWriteMemory readWriteRAM, byte[] lastInstruction, ReadWriteMemory readWriteGPR,   
             ReadWriteRegister readWriteIAR, ReadWriteRegister readWriteIR, ReadWriteRegister readWriteMAR,                  
             ReadWriteRegister readWriteTMP, ReadOnlyRegister readBUS1, ALUOperation runALUOperation,                                  
             ReadWriteRegister readWriteAcc, ReadWriteFlags readWriteFlags, RedrawGUI resetControlBits)
         {
+            registerMachine = true;
+
             //create new instance of each component
             //------------------------------------------------------
             ALU = new ALU(readWriteTMP, readBUS1, readWriteFlags);
@@ -2295,21 +2582,67 @@ namespace CPU_Simulator
             //-----------------------------------
         }
 
+        //initialise all CPU components for stack machine
+        public ControlUnit
+            (BitArray[] instructions, ReadWriteMemory readWriteRAM, byte[] lastInstruction, 
+            ReadWriteStack pushPopStack, ReadWriteRegister readWriteStack,
+            ReadWriteRegister readWriteIAR, ReadWriteRegister readWriteIR, ReadWriteRegister readWriteMAR,
+            ReadWriteRegister readWriteTOS, ReadOnlyRegister readBUS1, ALUOperation runALUOperation,
+            ReadWriteRegister readWriteAcc, ReadWriteFlags readWriteFlags, RedrawGUI resetControlBits)
+        {
+            registerMachine = false;
+
+            //create new instance of each component
+            //------------------------------------------------------
+            ALU = new ALU(readWriteTOS, readBUS1, readWriteFlags);
+            ACC = new Register(readWriteAcc);
+            MAR = new MAR(instructions, readWriteRAM, readWriteMAR);
+            IAR = new Register(readWriteIAR);
+            IR = new Register(readWriteIR);
+
+            //stack
+            for (int count = 0; count < Globals.STACK_SIZE; count++)
+            {
+                if (count == 0) stack[count] = new Register(readWriteStack);    //top element can invoke read/write event
+                else stack[count] = new Register();
+            }
+            //------------------------------------------------------
+
+            this.lastInstruction = new BitArray(lastInstruction);
+
+            //link methods to events
+            //-----------------------------------
+            PushPopStack += pushPopStack;           //invoke when the CPU needs to push or pop data from the stack
+            ReadWriteFlags += readWriteFlags;       //invoke when the CPU needs to read or write from a flag
+            RunALUOperation += runALUOperation;     //invoke when the CPU runs an ALU instruction
+            ResetControlBits += resetControlBits;   //invoke at the end of an instruction step (i.e. writing to a register, resetting flags etc.)
+            //-----------------------------------
+        }
+
         public void start()
         {
             //reset eveything to 0
             if (programFinished)
             {
-                IR.resetContents();
-                IAR.resetContents();
-                MAR.resetContents();
-                ALU.TMP.resetContents();
-                ACC.resetContents();
-
-                for (int count = 0; count < Globals.NO_OF_GPR; count++)
-                    GPR[count].resetContents();
+                IR.setContents();
+                IAR.setContents();
+                MAR.setContents();
+                ALU.TMP.setContents();
+                ACC.setContents();
 
                 for (int count = 0; count < Globals.NO_OF_FLAGS; count++) ALU.flags[count] = false;
+
+                if (registerMachine)
+                {
+                    for (int count = 0; count < Globals.NO_OF_GPR; count++)
+                        GPR[count].setContents();
+                }
+
+                else
+                {
+                    for (int count = 0; count < Globals.STACK_SIZE; count++)
+                        stack[count].setContents();
+                }
 
                 programFinished = false;
             }
@@ -2511,20 +2844,24 @@ namespace CPU_Simulator
             {
                 switch (opcodeAsString)
                 {
-                    case Globals.OP_LOAD:
-                        load();
+                    case Globals.OP_LOAD_POP:
+                        if (registerMachine) load();
+                        else pop();
                         break;
 
-                    case Globals.OP_STORE:
-                        store();
+                    case Globals.OP_STORE_SWAP:
+                        if (registerMachine) store();
+                        else swap();
                         break;
 
-                    case Globals.OP_DATA:
-                        data();
+                    case Globals.OP_DATA_PUSH:
+                        if (registerMachine) data();
+                        else push();
                         break;
 
-                    case Globals.OP_JUMP_RG:
-                        jumpRegister();
+                    case Globals.OP_JUMP_RG_TOS:
+                        if (registerMachine) jumpRegister();
+                        else jumpTOS();
                         break;
 
                     case Globals.OP_JUMP:
@@ -2547,6 +2884,9 @@ namespace CPU_Simulator
             }
         }
 
+
+        //REGISTER
+        //--------------------------------------------------------------------------------
         //save data to register B, data located in RAM by register A
         private void load()
         {
@@ -2615,7 +2955,133 @@ namespace CPU_Simulator
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
+        //--------------------------------------------------------------------------------
 
+        //STACK
+        //--------------------------------------------------------------------------------
+        //pop data into location at next address - pop without saving if blank
+        private void pop()
+        {
+            //prep MAR with address in IAR
+            MAR.overwriteContents(IAR.readContents());
+
+            ResetControlBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+
+            //point IAR to next instruction after data
+            incrementIAR();
+
+            //get location to pop data into and prep into MAR
+            BitArray addressToPop = MAR.readFromMemory();
+
+            //check if address is blank
+            bool isBlank = true;
+            for (int count = 0; count < Globals.WORD_SIZE; count++)     
+            {
+                //break at first non zero bit
+                if (addressToPop[count])                                
+                {
+                    isBlank = false;
+                    break;
+                }
+            }
+
+            if (!isBlank)
+            {
+                //prep memory for write
+                MAR.overwriteContents(addressToPop);
+
+                ResetControlBits?.Invoke();
+                if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+
+                //write data in TOS to memory
+                MAR.writeToMemory(ALU.TMP.readContents());  //SHOULD ENABLE BUS NOT FEED TO ALU
+
+                ResetControlBits?.Invoke();
+                if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+            }
+
+            //shift stack upwards by 1
+            for (int lead = 0, trail = lead - 1; lead < Globals.STACK_SIZE; lead++, trail++)
+            {
+                if (lead == 0) ALU.TMP.setContents(stack[lead].getContents());   //copy top of stack into TOS
+                else stack[trail].setContents(stack[lead].getContents());
+
+                PushPopStack?.Invoke(Globals.REGISTER_READ, lead);
+                Thread.Sleep(Globals.CLOCK_SPEED);
+            }
+
+            ResetControlBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+        }
+
+        private void swap()
+        {
+            //copy TOS to ACC
+            ACC.overwriteContents(ALU.TMP.readContents());     
+
+            ResetControlBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+
+            //copy top of stack into TOS
+            ALU.TMP.overwriteContents(stack[0].readContents()); 
+
+            ResetControlBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+
+            //copy ACC to top of stack
+            stack[0].overwriteContents(ACC.readContents());      
+
+            ResetControlBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+        }
+
+        private void push()
+        {
+            //prep MAR with address in IAR
+            MAR.overwriteContents(IAR.readContents());
+
+            ResetControlBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+
+            //point IAR to next instruction after data
+            incrementIAR();
+
+            //start from the bottom and copy data from element above to current element
+            for (int lead = Globals.STACK_SIZE - 1, trail = lead - 1; trail >= 0; lead--, trail--)
+            {
+                stack[lead].setContents(stack[trail].getContents());
+                PushPopStack?.Invoke(Globals.REGISTER_WRITE, lead);
+                Thread.Sleep(Globals.CLOCK_SPEED);
+            }
+
+            //copy TOS into top of stack
+            stack[0].setContents(ALU.TMP.getContents());
+            PushPopStack?.Invoke(Globals.REGISTER_WRITE, 0);
+            Thread.Sleep(Globals.CLOCK_SPEED);
+
+            ResetControlBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+
+            //push new data into TOS
+            ALU.TMP.overwriteContents(MAR.readFromMemory());
+
+            ResetControlBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+        }
+
+        private void jumpTOS()
+        {
+            //copy TOS to IAR
+            IAR.overwriteContents(ALU.TMP.readContents());
+
+            ResetControlBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+        }
+        //--------------------------------------------------------------------------------
+
+        //ALL
+        //--------------------------------------------------------------------------------
         //jump to address stored in next memory location
         private void jump()
         {
@@ -2669,5 +3135,6 @@ namespace CPU_Simulator
             //set all flags to 0
             for (int count = 0; count < Globals.NO_OF_FLAGS; count++) ALU.flags[count] = false;
         }
+        //--------------------------------------------------------------------------------
     }
 }
