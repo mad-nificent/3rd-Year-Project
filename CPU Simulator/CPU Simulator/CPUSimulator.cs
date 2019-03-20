@@ -22,12 +22,13 @@ namespace CPU_Simulator
         private Thread CPUThread;
         private ControlUnit CU;
 
+        private bool registerSelected = false;
+
         //indicates if a quick redraw can be done
         private bool welcomeScreenDrawn = false;
         private bool UIDrawn = false;
         private bool registerScreenDrawn = false;
         private bool stackScreenDrawn = false;
-        private bool registerSelected = false;
 
         //welcome screen
         private Label lblWelcome = new Label();
@@ -1283,33 +1284,56 @@ namespace CPU_Simulator
 
             //instructions, template above
             BitArray push = new BitArray(new bool[] { false, false, true, false, false, false, false, false });
-            BitArray inputA = new BitArray(new bool[] { true, false, true, false, true, false, true, false });
-            BitArray inputB = new BitArray(new bool[] { true, true, true, true, true, true, true, true });
+            BitArray inputA = new BitArray(new bool[] { true, false, false, false, false, false, false, false });
+            BitArray lShift = new BitArray(new bool[] { true,  false, true,  false, false, false, false, false });
+
+            BitArray add = new BitArray(new bool[] { true, false, false, false, false, false, false, false });
+            BitArray rShift = new BitArray(new bool[] { true,  false, false, true, false, false, false, false });
+            BitArray not = new BitArray(new bool[] { true, false, true, true, false, false, false, false });
+            BitArray and = new BitArray(new bool[] { true,  true,  false, false, false, false, false, false });
+            BitArray or = new BitArray(new bool[] { true,  true,  false, true,  false, false, false, false });
+            BitArray xor      = new BitArray(new bool[] { true,  true,  true,  false, false, false, false, false });
+            BitArray compare  = new BitArray(new bool[] { true,  true,  true,  true,  false, false, false, false });
+
+            BitArray inputB = new BitArray(new bool[] { true, false, false, false, false, false, false, false });
             BitArray inputC = new BitArray(new bool[] { true, true, true, true, false, false, false, false });
             BitArray inputD = new BitArray(new bool[] { false, false, false, false, true, true, true, true });
+
             BitArray pop = new BitArray(new bool[] { false, false, false, false, false, false, false, false });
-            BitArray address = new BitArray(new bool[] { false, false, false, false, true, false, true, true });
             BitArray swap = new BitArray(new bool[] { false, false, false, true, false, false, false, false });
+            BitArray jumpTOS = new BitArray(new bool[] { false, false, true,  true, false, false, false, false });
+            BitArray address = new BitArray(new bool[] { false, false, false, false, true, false, true, true });
 
             //reverse the bit arrays
             push = Globals.reverseBitArray(push);
+            pop = Globals.reverseBitArray(pop);
+            swap = Globals.reverseBitArray(swap);
+            jumpTOS = Globals.reverseBitArray(jumpTOS);
+
             inputA = Globals.reverseBitArray(inputA);
             inputB = Globals.reverseBitArray(inputB);
             inputC = Globals.reverseBitArray(inputC);
             inputD = Globals.reverseBitArray(inputD);
-            pop = Globals.reverseBitArray(pop);
             address = Globals.reverseBitArray(address);
-            swap = Globals.reverseBitArray(swap);
+
+            add = Globals.reverseBitArray(add);
+            rShift = Globals.reverseBitArray(rShift);
+            lShift = Globals.reverseBitArray(lShift);
+            not = Globals.reverseBitArray(not);
+            and = Globals.reverseBitArray(and);
+            or = Globals.reverseBitArray(or);
+            xor = Globals.reverseBitArray(xor);
+            compare = Globals.reverseBitArray(compare);
 
             //index of last instruction
-            byte[] lastAddress = { 10 };
+            byte[] lastAddress = { 2 };
 
             //set instructions to load
-            BitArray[] instructions = new BitArray[] { push, inputA, push, inputB, push, inputC, push, inputD, pop, address, swap };
+            BitArray[] instructions = new BitArray[] { push, inputA, lShift };
 
             //create CPU and link methods to respond to events
             CU = new ControlUnit(instructions, accessRAMLocation, lastAddress, 
-                pushPopStack, accessStack,
+                pushPopStack, accessStack, readTMPToBus,
                 updateIARContents, updateIRContents, updateMARContents,
                 updateTMPContents, readBUS1, accessALU, updateAccumulatorContents,
                 updateFlagRegister, resetColours);
@@ -1510,6 +1534,33 @@ namespace CPU_Simulator
             }
         }
 
+        public void readTMPToBus()
+        {
+            if (InvokeRequired) Invoke(new ReadOnlyRegister(readTMPToBus));
+            else
+            {
+                Graphics circuit = CreateGraphics();
+                Pen controlWire = new Pen(Globals.READ_COLOR);
+                controlWire.Width = 2;
+
+                //read process
+                //-----------------------------------------------
+                //activate enable wire
+                circuit.DrawLine(controlWire, 160, 75, 325, 75);
+                circuit.DrawLine(controlWire, 325, 75, 325, 175);
+
+                //highlight data (visual aid)
+                lblTMPContents.ForeColor = Globals.READ_COLOR;
+
+                //data flows onto bus
+                enableBus();
+                //-----------------------------------------------
+
+                controlWire.Dispose();
+                circuit.Dispose();
+            }
+        }
+
         public void updateAccumulatorContents(BitArray data, bool accessMode)
         {
             if (InvokeRequired) Invoke(new ReadWriteRegister(updateAccumulatorContents), new object[] { data, accessMode });
@@ -1563,11 +1614,6 @@ namespace CPU_Simulator
 
                 circuit.Dispose();
             }
-        }
-
-        public void readTMPToBus()
-        {
-            //read TMP and enable bus instead of feeding to ALU
         }
 
         public void updateFlagRegister(bool accessMode, int flagIndex = -1)
@@ -2545,6 +2591,7 @@ namespace CPU_Simulator
         public event RedrawGUI ResetControlBits;        //GUI will turn off all control bits (set, enable, opcodes)
 
         public event ReadWriteStack PushPopStack;       //when invoked, GUI will shift all stack elements up (pop) or down (push)
+        public event ReadOnlyRegister ReadTOS;          //reading TOS using readContents() feeds its output to the ALU, this event outputs to the bus instead
 
         //tracks the last executable instruction in memory
         public readonly BitArray lastInstruction = new BitArray(Globals.WORD_SIZE);
@@ -2585,7 +2632,7 @@ namespace CPU_Simulator
         //initialise all CPU components for stack machine
         public ControlUnit
             (BitArray[] instructions, ReadWriteMemory readWriteRAM, byte[] lastInstruction, 
-            ReadWriteStack pushPopStack, ReadWriteRegister readWriteStack,
+            ReadWriteStack pushPopStack, ReadWriteRegister readWriteStack, ReadOnlyRegister readTOS,
             ReadWriteRegister readWriteIAR, ReadWriteRegister readWriteIR, ReadWriteRegister readWriteMAR,
             ReadWriteRegister readWriteTOS, ReadOnlyRegister readBUS1, ALUOperation runALUOperation,
             ReadWriteRegister readWriteAcc, ReadWriteFlags readWriteFlags, RedrawGUI resetControlBits)
@@ -2613,6 +2660,7 @@ namespace CPU_Simulator
             //link methods to events
             //-----------------------------------
             PushPopStack += pushPopStack;           //invoke when the CPU needs to push or pop data from the stack
+            ReadTOS += readTOS;                     //invoke to read TOS onto the bus instead of the ALU
             ReadWriteFlags += readWriteFlags;       //invoke when the CPU needs to read or write from a flag
             RunALUOperation += runALUOperation;     //invoke when the CPU runs an ALU instruction
             ResetControlBits += resetControlBits;   //invoke at the end of an instruction step (i.e. writing to a register, resetting flags etc.)
@@ -2732,7 +2780,7 @@ namespace CPU_Simulator
             }
 
             //non opcode bits GPR addresses
-            else
+            else if (registerMachine)
             {
                 //splice register address from instruction
                 for (int currentBit = 0, registerAIndex = Globals.GPR_ADDRESS_SIZE, registerBIndex = 0;
@@ -2757,84 +2805,147 @@ namespace CPU_Simulator
             //--------------------------------------------------------------------------------------------------------------------------
             if (opcode[Globals.ALU_OPCODE])
             {
-                //2 input operation, prep TMP
-                if (opcodeAsString != Globals.ALU_R_SHIFT && opcodeAsString != Globals.ALU_L_SHIFT && opcodeAsString != Globals.ALU_NOT)
-                {
-                    ReadWriteGPR?.Invoke(GPR[registerB].getContents(), registerB, Globals.REGISTER_READ);   //invoke GPR read
-                    ALU.TMP.overwriteContents(GPR[registerB].readContents());                               //copy register B to TMP
-
-                    ResetControlBits?.Invoke();
-                    if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
-
-                }
-
                 //run ALU operation and provide contents of register A as input
                 //-------------------------------------------------------------------------------------------
                 RunALUOperation?.Invoke(opcode);
 
-                switch (opcodeAsString)
+                //register specific ALU instructions
+                if (registerMachine)
                 {
-                    case Globals.ALU_ADD:
-                        ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
-                        ACC.overwriteContents(ALU.add(GPR[registerA].readContents()));
-                        break;
+                    //2 input operation, prep TMP
+                    if (opcodeAsString != Globals.ALU_R_SHIFT && opcodeAsString != Globals.ALU_L_SHIFT && opcodeAsString != Globals.ALU_NOT)
+                    {
+                        ReadWriteGPR?.Invoke(GPR[registerB].getContents(), registerB, Globals.REGISTER_READ);   //invoke GPR read
+                        ALU.TMP.overwriteContents(GPR[registerB].readContents());                               //copy register B to TMP
 
-                    case Globals.ALU_R_SHIFT:
-                        ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
-                        ACC.overwriteContents(ALU.shiftRight(GPR[registerA].readContents()));
-                        break;
+                        ResetControlBits?.Invoke();
+                        if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
-                    case Globals.ALU_L_SHIFT:
-                        ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
-                        ACC.overwriteContents(ALU.shiftLeft(GPR[registerA].readContents()));
-                        break;
+                    }
 
-                    case Globals.ALU_NOT:
-                        ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
-                        ACC.overwriteContents(ALU.inverse(GPR[registerA].readContents()));
-                        break;
+                    switch (opcodeAsString)
+                    {
+                        case Globals.ALU_ADD:
+                            ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
+                            ACC.overwriteContents(ALU.add(GPR[registerA].readContents()));
+                            break;
 
-                    case Globals.ALU_AND:
-                        ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
-                        ACC.overwriteContents(ALU.and(GPR[registerA].readContents()));
-                        break;
+                        case Globals.ALU_R_SHIFT:
+                            ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
+                            ACC.overwriteContents(ALU.shiftRight(GPR[registerA].readContents()));
+                            break;
 
-                    case Globals.ALU_OR:
-                        ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
-                        ACC.overwriteContents(ALU.or(GPR[registerA].readContents()));
-                        break;
+                        case Globals.ALU_L_SHIFT:
+                            ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
+                            ACC.overwriteContents(ALU.shiftLeft(GPR[registerA].readContents()));
+                            break;
 
-                    case Globals.ALU_XOR:
-                        ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
-                        ACC.overwriteContents(ALU.xor(GPR[registerA].readContents()));
-                        break;
+                        case Globals.ALU_NOT:
+                            ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
+                            ACC.overwriteContents(ALU.inverse(GPR[registerA].readContents()));
+                            break;
 
-                    case Globals.ALU_COMPARE:
-                        ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
-                        ALU.compare(GPR[registerA].readContents());
-                        Thread.Sleep(Globals.CLOCK_SPEED);
-                        break;
+                        case Globals.ALU_AND:
+                            ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
+                            ACC.overwriteContents(ALU.and(GPR[registerA].readContents()));
+                            break;
 
-                    default:
-                        MessageBox.Show("Invalid opcode");
-                        break;
-                }
-                //-------------------------------------------------------------------------------------------
+                        case Globals.ALU_OR:
+                            ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
+                            ACC.overwriteContents(ALU.or(GPR[registerA].readContents()));
+                            break;
 
-                ResetControlBits?.Invoke();
-                if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+                        case Globals.ALU_XOR:
+                            ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
+                            ACC.overwriteContents(ALU.xor(GPR[registerA].readContents()));
+                            break;
 
-                //compare operation doesn't output to accumulator
-                if (opcodeAsString != Globals.ALU_COMPARE)
-                {
-                    //copy accumulator into register B
-                    GPR[registerB].overwriteContents(ACC.readContents());
-                    ReadWriteGPR?.Invoke(GPR[registerB].getContents(), registerB, Globals.REGISTER_WRITE);
-                    Thread.Sleep(Globals.CLOCK_SPEED);
+                        case Globals.ALU_COMPARE:
+                            ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
+                            ALU.compare(GPR[registerA].readContents());
+                            Thread.Sleep(Globals.CLOCK_SPEED);
+                            break;
+
+                        default:
+                            MessageBox.Show("Invalid opcode");
+                            break;
+                    }
 
                     ResetControlBits?.Invoke();
                     if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+
+                    //compare operation doesn't output to accumulator
+                    if (opcodeAsString != Globals.ALU_COMPARE)
+                    {
+                        //copy accumulator into register B
+                        GPR[registerB].overwriteContents(ACC.readContents());
+                        ReadWriteGPR?.Invoke(GPR[registerB].getContents(), registerB, Globals.REGISTER_WRITE);
+                        Thread.Sleep(Globals.CLOCK_SPEED);
+
+                        ResetControlBits?.Invoke();
+                        if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+                    }
                 }
+
+                //stack specific ALU instructions
+                else
+                {
+                    //*no need to prep for 2 input operations, TOS directly feeds to ALU*
+
+                    switch (opcodeAsString)
+                    {
+                        case Globals.ALU_ADD:
+                            ACC.overwriteContents(ALU.add(stack[0].readContents()));
+                            break;
+
+                        case Globals.ALU_R_SHIFT:
+                            ACC.overwriteContents(ALU.shiftRight(ALU.TMP.readContents()));
+                            break;
+
+                        case Globals.ALU_L_SHIFT:
+                            ACC.overwriteContents(ALU.shiftLeft(ALU.TMP.readContents()));
+                            break;
+
+                        case Globals.ALU_NOT:
+                            ACC.overwriteContents(ALU.inverse(ALU.TMP.readContents()));
+                            break;
+
+                        case Globals.ALU_AND:
+                            ACC.overwriteContents(ALU.and(stack[0].readContents()));
+                            break;
+
+                        case Globals.ALU_OR:
+                            ACC.overwriteContents(ALU.or(stack[0].readContents()));
+                            break;
+
+                        case Globals.ALU_XOR:
+                            ACC.overwriteContents(ALU.xor(stack[0].readContents()));
+                            break;
+
+                        case Globals.ALU_COMPARE:
+                            ALU.compare(stack[0].readContents());
+                            Thread.Sleep(Globals.CLOCK_SPEED);
+                            break;
+
+                        default:
+                            MessageBox.Show("Invalid opcode");
+                            break;
+                    }
+
+                    ResetControlBits?.Invoke();
+                    if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+
+                    //compare operation doesn't output to accumulator
+                    if (opcodeAsString != Globals.ALU_COMPARE)
+                    {
+                        //push accumulator result into stack
+                        push(ACC);
+
+                        ResetControlBits?.Invoke();
+                        if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+                    }
+                }
+                //-------------------------------------------------------------------------------------------
             }
             //--------------------------------------------------------------------------------------------------------------------------
 
@@ -2883,7 +2994,6 @@ namespace CPU_Simulator
                 //--------------------------------------------------------------------
             }
         }
-
 
         //REGISTER
         //--------------------------------------------------------------------------------
@@ -2959,7 +3069,7 @@ namespace CPU_Simulator
 
         //STACK
         //--------------------------------------------------------------------------------
-        //pop data into location at next address - pop without saving if blank
+        //pop data into location at next instruction address - pop without saving if blank
         private void pop()
         {
             //prep MAR with address in IAR
@@ -2995,7 +3105,8 @@ namespace CPU_Simulator
                 if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
                 //write data in TOS to memory
-                MAR.writeToMemory(ALU.TMP.readContents());  //SHOULD ENABLE BUS NOT FEED TO ALU
+                ReadTOS?.Invoke();
+                MAR.writeToMemory(ALU.TMP.getContents());
 
                 ResetControlBits?.Invoke();
                 if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
@@ -3015,6 +3126,7 @@ namespace CPU_Simulator
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
 
+        //swap contents of TOS register with top of stack
         private void swap()
         {
             //copy TOS to ACC
@@ -3036,6 +3148,7 @@ namespace CPU_Simulator
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
 
+        //fetch data at next instruction address, push into the stack
         private void push()
         {
             //prep MAR with address in IAR
@@ -3070,10 +3183,38 @@ namespace CPU_Simulator
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
 
+        //push data provided (used to push data not from memory, e.g. from ACC after ALU operation)
+        private void push(Register register)
+        {
+            //start from the bottom and copy data from element above to current element
+            for (int lead = Globals.STACK_SIZE - 1, trail = lead - 1; trail >= 0; lead--, trail--)
+            {
+                stack[lead].setContents(stack[trail].getContents());
+                PushPopStack?.Invoke(Globals.REGISTER_WRITE, lead);
+                Thread.Sleep(Globals.CLOCK_SPEED);
+            }
+
+            //copy TOS into top of stack
+            stack[0].setContents(ALU.TMP.getContents());
+            PushPopStack?.Invoke(Globals.REGISTER_WRITE, 0);
+            Thread.Sleep(Globals.CLOCK_SPEED);
+
+            ResetControlBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+
+            //push new data into TOS
+            ALU.TMP.overwriteContents(register.readContents());
+
+            ResetControlBits?.Invoke();
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
+        }
+
+        //jump to address stored in TOS
         private void jumpTOS()
         {
             //copy TOS to IAR
-            IAR.overwriteContents(ALU.TMP.readContents());
+            ReadTOS?.Invoke();
+            IAR.overwriteContents(ALU.TMP.getContents());
 
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
