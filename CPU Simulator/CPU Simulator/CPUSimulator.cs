@@ -1192,59 +1192,88 @@ namespace CPU_Simulator
 
         private void loadRegisterCPU()
         {
-            //-------------------------------------------------------------------------------------------------------------
+            //------------------------------------------------------------------------------------------------------------
             //                                                        opcode            |  register A   |  register B
-            //--------------------------------------------------------------------------|---------------|------------------
-            //BitArray load     = new BitArray(new bool[] { false, false, false, false, | false, false, | false, false, });
-            //BitArray store    = new BitArray(new bool[] { false, false, false, true,  | false, false, | false, false, });
-            //BitArray data     = new BitArray(new bool[] { false, false, true,  false, | false, false, | false, false, });
-            //BitArray jumpRG   = new BitArray(new bool[] { false, false, true,  true,  | false, false, | false, false, });
-            //BitArray jump     = new BitArray(new bool[] { false, true,  false, false, | false, false, | false, false, });
-            //--------------------------------------------------------------------------|----------------------------------
-            //                                                        opcode            |   0   |  A >  |   =   | COUT
-            //BitArray jumpIf   = new BitArray(new bool[] { false, true,  false, true,  | false, false, | false, false, });
-            //--------------------------------------------------------------------------|----------------------------------
-            //BitArray resetFlg = new BitArray(new bool[] { false, true,  true,  false, | false, false, | false, false, });
-            //BitArray IO       = new BitArray(new bool[] { false, true,  true,  true,  | false, false, | false, false, });
-            //--------------------------------------------------------------------------|---------------|------------------
-            //BitArray add      = new BitArray(new bool[] { true,  false, false, false, | false, false, | false, false, });
-            //BitArray rShift   = new BitArray(new bool[] { true,  false, false, true,  | false, false, | false, false, });
-            //BitArray lShift   = new BitArray(new bool[] { true,  false, true,  false, | false, false, | false, false, });
-            //BitArray not      = new BitArray(new bool[] { true,  false, true,  true,  | false, false, | false, false, });
-            //BitArray and      = new BitArray(new bool[] { true,  true,  false, false, | false, false, | false, false, });
-            //BitArray or       = new BitArray(new bool[] { true,  true,  false, true,  | false, false, | false, false, });
-            //BitArray xor      = new BitArray(new bool[] { true,  true,  true,  false, | false, false, | false, false, });
-            //BitArray compare  = new BitArray(new bool[] { true,  true,  true,  true,  | false, false, | false, false, });
+            //--------------------------------------------------------------------------|---------------|-----------------
+            //BitArray load     = new BitArray(new bool[] { false, false, false, false, | false, false, | false, false });
+            //BitArray store    = new BitArray(new bool[] { false, false, false, true,  | false, false, | false, false });
+            //BitArray data     = new BitArray(new bool[] { false, false, true,  false, | false, false, | false, false });
+            //BitArray jumpRG   = new BitArray(new bool[] { false, false, true,  true,  | false, false, | false, false });
+            //BitArray jump     = new BitArray(new bool[] { false, true,  false, false, | false, false, | false, false });
+            //--------------------------------------------------------------------------|---------------------------------
+            //                                                        opcode            |  COUT |  A >  |   =   |  0
+            //BitArray jumpIf   = new BitArray(new bool[] { false, true,  false, true,  | false, false, | false, false });
+            //--------------------------------------------------------------------------|---------------------------------
+            //BitArray resetFlg = new BitArray(new bool[] { false, true,  true,  false, | false, false, | false, false });
+            //BitArray IO       = new BitArray(new bool[] { false, true,  true,  true,  | false, false, | false, false });
+            //--------------------------------------------------------------------------|---------------|-----------------
+            //BitArray add      = new BitArray(new bool[] { true,  false, false, false, | false, false, | false, false });
+            //BitArray rShift   = new BitArray(new bool[] { true,  false, false, true,  | false, false, | false, false });
+            //BitArray lShift   = new BitArray(new bool[] { true,  false, true,  false, | false, false, | false, false });
+            //BitArray not      = new BitArray(new bool[] { true,  false, true,  true,  | false, false, | false, false });
+            //BitArray and      = new BitArray(new bool[] { true,  true,  false, false, | false, false, | false, false });
+            //BitArray or       = new BitArray(new bool[] { true,  true,  false, true,  | false, false, | false, false });
+            //BitArray xor      = new BitArray(new bool[] { true,  true,  true,  false, | false, false, | false, false });
+            //BitArray compare  = new BitArray(new bool[] { true,  true,  true,  true,  | false, false, | false, false });
             //-------------------------------------------------------------------------------------------------------------
 
             //instructions
-            BitArray dataIntoReg1 = new BitArray(new bool[] { false, false, true, false, false, false, false, false });
-            BitArray inputA = new BitArray(new bool[] { true, false, false, false, false, false, false, false });
-            BitArray dataIntoReg2 = new BitArray(new bool[] { false, false, true, false, false, false, false, true });
-            BitArray inputB = new BitArray(new bool[] { true, true, true, true, true, true, true, false });
-            BitArray add = new BitArray(new bool[] { true, false, false, false, false, false, false, true });
-
-            BitArray jumpIf = new BitArray(new bool[] { false, true, false, true, false, false, false, true });
-            BitArray address = new BitArray(new bool[] { false, false, false, false, true, false, true, false });
             BitArray empty = new BitArray(new bool[] { false, false, false, false, false, false, false, false });
-            BitArray dataIntoReg3 = new BitArray(new bool[] { false, false, true, false, false, false, true, false });
+
+            BitArray inputA = new BitArray(new bool[] { true, true, true, true, true, true, true, true });
+            BitArray inputB = new BitArray(new bool[] { true, false, false, false, false, false, false, true });
             BitArray inputC = new BitArray(new bool[] { false, true, true, true, true, true, true, false });
+            BitArray address = new BitArray(new bool[] { false, false, false, false, true, false, false, false });
 
-            dataIntoReg1 = Globals.reverseBitArray(dataIntoReg1);
-            inputA = Globals.reverseBitArray(inputA);
-            dataIntoReg2 = Globals.reverseBitArray(dataIntoReg2);
-            inputB = Globals.reverseBitArray(inputB);
-            add = Globals.reverseBitArray(add);
+            BitArray load = new BitArray(new bool[] { false, false, false, false, false, false, false, true });
+            BitArray store = new BitArray(new bool[] { false, false, false, true, false, false, false, true });
+            BitArray dataIntoReg1 = new BitArray(new bool[] { false, false, true, false, false, false, false, false });
+            BitArray dataIntoReg2 = new BitArray(new bool[] { false, false, true, false, false, false, false, true });
+            BitArray dataIntoReg3 = new BitArray(new bool[] { false, false, true, false, false, false, true, false });
+            BitArray dataIntoReg4 = new BitArray(new bool[] { false, false, true, false, false, false, true, true });
+            BitArray jumpRG = new BitArray(new bool[] { false, false, true, true, false, false, false, false });
+            BitArray jump = new BitArray(new bool[] { false, true, false, false, false, false, false, false });
+            BitArray jumpIf = new BitArray(new bool[] { false, true, false, true, true, false, false, false });
+            BitArray resetFlg = new BitArray(new bool[] { false, true, true, false, false, false, false, false });
 
-            jumpIf = Globals.reverseBitArray(jumpIf);
+            BitArray add = new BitArray(new bool[] { true, false, false, false, false, false, false, true });
+            BitArray rShift = new BitArray(new bool[] { true, false, false, true, false, false, false, true });
+            BitArray lShift = new BitArray(new bool[] { true, false, true, false, false, false, false, true });
+            BitArray not = new BitArray(new bool[] { true, false, true, true, false, false, false, true });
+            BitArray and = new BitArray(new bool[] { true, true, false, false, false, false, false, true });
+            BitArray or = new BitArray(new bool[] { true, true, false, true, false, false, false, true });
+            BitArray xor = new BitArray(new bool[] { true, true, true, false, false, false, false, true });
+            BitArray compare = new BitArray(new bool[] { true, true, true, true, false, false, false, true });
+
             address = Globals.reverseBitArray(address);
-            dataIntoReg3 = Globals.reverseBitArray(dataIntoReg3);
+            inputA = Globals.reverseBitArray(inputA);
+            inputB = Globals.reverseBitArray(inputB);
             inputC = Globals.reverseBitArray(inputC);
 
-            byte[] lastAddress = { 10 };
+            load = Globals.reverseBitArray(load);
+            store = Globals.reverseBitArray(store);
+            dataIntoReg1 = Globals.reverseBitArray(dataIntoReg1);
+            dataIntoReg2 = Globals.reverseBitArray(dataIntoReg2);
+            dataIntoReg3 = Globals.reverseBitArray(dataIntoReg3);
+            dataIntoReg4 = Globals.reverseBitArray(dataIntoReg4);
+            jumpRG = Globals.reverseBitArray(jumpRG);
+            jump = Globals.reverseBitArray(jump);
+            jumpIf = Globals.reverseBitArray(jumpIf);
+            resetFlg = Globals.reverseBitArray(resetFlg);
+
+            add = Globals.reverseBitArray(add);
+            rShift = Globals.reverseBitArray(rShift);
+            lShift = Globals.reverseBitArray(lShift);
+            not = Globals.reverseBitArray(not);
+            and = Globals.reverseBitArray(and);
+            or = Globals.reverseBitArray(or);
+            xor = Globals.reverseBitArray(xor);
+            compare = Globals.reverseBitArray(compare);
+
+            byte[] lastAddress = { 2 };
 
             //set instructions to load
-            BitArray[] instructions = new BitArray[] { dataIntoReg1, inputA, dataIntoReg2, inputB, add, jumpIf, address, empty, empty, empty, dataIntoReg3, inputC };
+            BitArray[] instructions = new BitArray[] { dataIntoReg1, inputB, lShift };
 
             //link GUI events to CPU registers
             CU = new ControlUnit(instructions, accessRAMLocation, lastAddress,
@@ -1283,32 +1312,39 @@ namespace CPU_Simulator
             //-------------------------------------------------------------------------------------------------------------
 
             //instructions, template above
-            BitArray push = new BitArray(new bool[] { false, false, true, false, false, false, false, false });
-            BitArray inputA = new BitArray(new bool[] { true, false, false, false, false, false, false, false });
-            BitArray lShift = new BitArray(new bool[] { true,  false, true,  false, false, false, false, false });
+            BitArray empty = new BitArray(new bool[] { false, false, false, false, false, false, false, false });
 
-            BitArray add = new BitArray(new bool[] { true, false, false, false, false, false, false, false });
-            BitArray rShift = new BitArray(new bool[] { true,  false, false, true, false, false, false, false });
-            BitArray not = new BitArray(new bool[] { true, false, true, true, false, false, false, false });
-            BitArray and = new BitArray(new bool[] { true,  true,  false, false, false, false, false, false });
-            BitArray or = new BitArray(new bool[] { true,  true,  false, true,  false, false, false, false });
-            BitArray xor      = new BitArray(new bool[] { true,  true,  true,  false, false, false, false, false });
-            BitArray compare  = new BitArray(new bool[] { true,  true,  true,  true,  false, false, false, false });
-
-            BitArray inputB = new BitArray(new bool[] { true, false, false, false, false, false, false, false });
+            BitArray address = new BitArray(new bool[] { false, false, false, false, false, true, true, true });
+            BitArray inputA = new BitArray(new bool[] { true, true, true, true, true, true, true, true });
+            BitArray inputB = new BitArray(new bool[] { false, false, false, false, false, false, false, true });
             BitArray inputC = new BitArray(new bool[] { true, true, true, true, false, false, false, false });
             BitArray inputD = new BitArray(new bool[] { false, false, false, false, true, true, true, true });
 
             BitArray pop = new BitArray(new bool[] { false, false, false, false, false, false, false, false });
             BitArray swap = new BitArray(new bool[] { false, false, false, true, false, false, false, false });
-            BitArray jumpTOS = new BitArray(new bool[] { false, false, true,  true, false, false, false, false });
-            BitArray address = new BitArray(new bool[] { false, false, false, false, true, false, true, true });
+            BitArray push = new BitArray(new bool[] { false, false, true, false, false, false, false, false });
+            BitArray jumpTOS = new BitArray(new bool[] { false, false, true, true, false, false, false, false });
+            BitArray jump = new BitArray(new bool[] { false, true, false, false, false, false, false, false });
+            BitArray jumpIf = new BitArray(new bool[] { false, true, false, true, true, false, false, false });
+            BitArray resetFlg = new BitArray(new bool[] { false, true, true, false, false, false, false, false });
+
+            BitArray add = new BitArray(new bool[] { true, false, false, false, false, false, false, false });
+            BitArray rShift = new BitArray(new bool[] { true, false, false, true, false, false, false, false });
+            BitArray lShift = new BitArray(new bool[] { true, false, true, false, false, false, false, false });
+            BitArray not = new BitArray(new bool[] { true, false, true, true, false, false, false, false });
+            BitArray and = new BitArray(new bool[] { true, true, false, false, false, false, false, false });
+            BitArray or = new BitArray(new bool[] { true, true, false, true, false, false, false, false });
+            BitArray xor = new BitArray(new bool[] { true, true, true, false, false, false, false, false });
+            BitArray compare = new BitArray(new bool[] { true, true, true, true, false, false, false, false });
 
             //reverse the bit arrays
             push = Globals.reverseBitArray(push);
             pop = Globals.reverseBitArray(pop);
             swap = Globals.reverseBitArray(swap);
             jumpTOS = Globals.reverseBitArray(jumpTOS);
+            jump = Globals.reverseBitArray(jump);
+            jumpIf = Globals.reverseBitArray(jumpIf);
+            resetFlg = Globals.reverseBitArray(resetFlg);
 
             inputA = Globals.reverseBitArray(inputA);
             inputB = Globals.reverseBitArray(inputB);
@@ -1326,10 +1362,10 @@ namespace CPU_Simulator
             compare = Globals.reverseBitArray(compare);
 
             //index of last instruction
-            byte[] lastAddress = { 2 };
+            byte[] lastAddress = { 4 };
 
             //set instructions to load
-            BitArray[] instructions = new BitArray[] { push, inputA, lShift };
+            BitArray[] instructions = new BitArray[] { push, inputA, push, inputA, compare };
 
             //create CPU and link methods to respond to events
             CU = new ControlUnit(instructions, accessRAMLocation, lastAddress, 
@@ -1657,7 +1693,7 @@ namespace CPU_Simulator
 
                     switch (flagIndex)
                     {
-                        case 0:
+                        case Globals.COUT_FLAG:
                             circuit.DrawLine(controlWire, 140, 280, 170, 280);  //data flows from ALU to COUT
                             circuit.DrawLine(controlWire, 245, 280, 275, 280);  //continues flow to CU
 
@@ -1667,31 +1703,31 @@ namespace CPU_Simulator
                             circuit.DrawLine(controlWire, 260, 230, 140, 230);   
 
                             lblCoutContents.Text = "1";                         //data flows into memory (contents changed)
-                            lblCoutContents.ForeColor = Globals.WRITE_COLOR;     //highlight data (visual aid)
+                            lblCoutContents.ForeColor = Globals.WRITE_COLOR;    //highlight data (visual aid)
                             break;
 
-                        case 1:
+                        case Globals.EQUAL_FLAG:
                             circuit.DrawLine(controlWire, 140, 320, 170, 320);  //data flows from ALU to EQUAL
                             circuit.DrawLine(controlWire, 245, 320, 275, 320);  //continues flow to CU
 
                             lblEqualContents.Text = "1";                        //data flows into memory (contents changed)
-                            lblEqualContents.ForeColor = Globals.WRITE_COLOR;    //highlight data (visual aid)
+                            lblEqualContents.ForeColor = Globals.WRITE_COLOR;   //highlight data (visual aid)
                             break;
 
-                        case 2:
+                        case Globals.A_LARGER_FLAG:
                             circuit.DrawLine(controlWire, 140, 300, 170, 300);  //data flows from ALU to A LARGER
                             circuit.DrawLine(controlWire, 245, 300, 275, 300);  //continues flow to CU
 
                             lblALargerContents.Text = "1";                      //data flows into memory (contents changed)
-                            lblALargerContents.ForeColor = Globals.WRITE_COLOR;  //highlight data (visual aid)
+                            lblALargerContents.ForeColor = Globals.WRITE_COLOR; //highlight data (visual aid)
                             break;
 
-                        case 3:
+                        case Globals.ZERO_FLAG:
                             circuit.DrawLine(controlWire, 140, 340, 170, 340);  //data flows from ALU to ZERO
                             circuit.DrawLine(controlWire, 245, 340, 275, 340);  //continues flow to CU
 
                             lblZeroContents.Text = "1";                         //data flows into memory (contents changed)
-                            lblZeroContents.ForeColor = Globals.WRITE_COLOR;     //highlight data (visual aid)
+                            lblZeroContents.ForeColor = Globals.WRITE_COLOR;    //highlight data (visual aid)
                             break;
 
                         default:
@@ -1700,6 +1736,16 @@ namespace CPU_Simulator
                             lblALargerContents.Text = "0";
                             lblEqualContents.Text = "0";
                             lblZeroContents.Text = "0";
+
+                            circuit.DrawLine(controlWire, 245, 280, 275, 280);  //data flows from COUT to CU
+                            circuit.DrawLine(controlWire, 245, 300, 275, 300);  //data flows from A LARGER to CU
+                            circuit.DrawLine(controlWire, 245, 320, 275, 320);  //data flows from EQUALS to CU
+                            circuit.DrawLine(controlWire, 245, 340, 275, 340);  //data flows from ZERO to CU
+
+                            //data flows from COUT back to CIN
+                            circuit.DrawLine(controlWire, 260, 280, 260, 230);
+                            circuit.FillEllipse(wireJoint, 255, 275, 8, 8);
+                            circuit.DrawLine(controlWire, 260, 230, 140, 230);
 
                             //highlight data (visual aid)
                             lblCoutContents.ForeColor = Globals.WRITE_COLOR;
@@ -2166,7 +2212,8 @@ namespace CPU_Simulator
                             ALU_ADD = "1000", ALU_R_SHIFT = "1001", ALU_L_SHIFT = "1010", ALU_NOT = "1011", 
                             ALU_AND = "1100", ALU_OR = "1101", ALU_XOR = "1110", ALU_COMPARE = "1111";
 
-        public const int ZERO_FLAG = 3, A_LARGER_FLAG = 2, EQUAL_FLAG = 1, COUT_FLAG = 0;
+        //indexes of flags are reversed to support BitArray big endian format 
+        public const int COUT_FLAG = 3, A_LARGER_FLAG = 2, EQUAL_FLAG = 1, ZERO_FLAG = 0; 
         //---------------------------------------------------------------------------------------------------------------
 
         //available memory
@@ -2300,19 +2347,22 @@ namespace CPU_Simulator
                 contents[count] = new Register();
         }
 
-        public BitArray readFromLocation(BitArray address)
+        public BitArray readFromLocation(BitArray address, bool invokeEvent)
         {
             byte addr = Globals.convertBitsToByte(address);
-            ReadWriteContents?.Invoke(contents[addr].readContents(), addr, Globals.REGISTER_READ);
+            if (invokeEvent) ReadWriteContents?.Invoke(contents[addr].readContents(), addr, Globals.REGISTER_READ);
             return contents[addr].readContents();
         }
 
-        public void writeToLocation(BitArray address, BitArray data)
+        public void writeToLocation(BitArray address, BitArray data, bool invokeEvent)
         {
             byte addr = Globals.convertBitsToByte(address);
             contents[addr].overwriteContents(data);
-            ReadWriteContents?.Invoke(data, addr, Globals.REGISTER_WRITE);
-            if (ReadWriteContents != null) Thread.Sleep(Globals.CLOCK_SPEED);
+            if (invokeEvent)
+            {
+                ReadWriteContents?.Invoke(data, addr, Globals.REGISTER_WRITE);
+                if (ReadWriteContents != null) Thread.Sleep(Globals.CLOCK_SPEED);
+            }
         }
     }
 
@@ -2326,8 +2376,8 @@ namespace CPU_Simulator
             : base(readWriteContents) { RAM = new RAM(instructions, readWriteRAM); }
 
         //use MAR to address and access a location in memory
-        public void writeToMemory(BitArray data) { RAM.writeToLocation(getContents(), data); }
-        public BitArray readFromMemory() { return RAM.readFromLocation(getContents()); }
+        public void writeToMemory(BitArray data, bool invokeEvent = true) { RAM.writeToLocation(getContents(), data, invokeEvent); }
+        public BitArray readFromMemory(bool invokeEvent = true) { return RAM.readFromLocation(getContents(), invokeEvent); }
     }
 
     public class ALU
@@ -2940,9 +2990,6 @@ namespace CPU_Simulator
                     {
                         //push accumulator result into stack
                         push(ACC);
-
-                        ResetControlBits?.Invoke();
-                        if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
                     }
                 }
                 //-------------------------------------------------------------------------------------------
@@ -3082,7 +3129,7 @@ namespace CPU_Simulator
             incrementIAR();
 
             //get location to pop data into and prep into MAR
-            BitArray addressToPop = MAR.readFromMemory();
+            BitArray addressToPop = MAR.readFromMemory(false);
 
             //check if address is blank
             bool isBlank = true;
@@ -3255,7 +3302,8 @@ namespace CPU_Simulator
 
                 //compare state of flags with condition
                 for (int count = 0; count < Globals.NO_OF_FLAGS && conditionmet; count++)
-                    if (flagCondition[count] && !ALU.flags[count]) conditionmet = false;
+                    if (flagCondition[count] && !ALU.flags[count] || !flagCondition[count] && ALU.flags[count])
+                        conditionmet = false;
 
                 if (conditionmet) jump();
                 else incrementIAR();        //step over jump address
