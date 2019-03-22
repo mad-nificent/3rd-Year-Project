@@ -8,24 +8,27 @@ using System.Threading;
 
 namespace CPU_Simulator
 {
-    public delegate void ReadOnlyRegister();                                            //BUS1
-    public delegate void ReadWriteRegister(BitArray data, bool accessMode);             //IR, IAR, MAR, TMP etc.
-    public delegate void ReadWriteMemory(BitArray data, int index, bool accessMode);    //require an address (i.e. RAM, GPRs)
-    public delegate void ReadWriteFlags(bool accessMode, int flag = -1);
-    public delegate void ALUOperation(BitArray opcode);                     
-    public delegate void RedrawGUI();                                                   //redraw before next step
+    public delegate void ReadOnlyRegister();                                            //enable BUS1 output, enable TOS onto bus
+    public delegate void ReadWriteRegister(BitArray data, bool accessMode);             //modify contents of IR, IAR, MAR, TMP etc.
+    public delegate void ReadWriteMemory(BitArray data, int index, bool accessMode);    //modify contents of register which require an address (i.e. RAM)
+    public delegate void ReadWriteFlags(bool accessMode, int index = -1);               //modify contents of flags
 
-    public delegate void ReadWriteStack(bool accessMode, int stackIndex);
+    public delegate void ReadWriteStack(bool accessMode, int stackIndex);               //push and pop to stack
+
+    public delegate void ALUOperation(BitArray opcode);                                 //indicate ALU in use                     
+    public delegate void RedrawGUI();                                                   //redraw before next step
 
     public partial class MainForm : Form
     {
-        //PRIVATE
-        private Thread CPUThread;
         private ControlUnit CU;
+        private Thread CPU;
 
-        private bool registerSelected;
-        BitArray[] instructions;
-        int lastInstruction;
+        //indicates which machine in use (register = true) (stack = false)
+        private bool registerMachine;
+
+        private BitArray[] instructions;
+        private int lastInstruction;
+        private bool halt;
 
         //indicates if a quick redraw can be done
         private bool welcomeScreenDrawn = false;
@@ -53,9 +56,9 @@ namespace CPU_Simulator
         RichTextBox txtCodeEditor = new RichTextBox();
         Button btnLoadCode = new Button();
         Button btnSaveCode = new Button();
+        Button btnShowInstructions = new Button();
 
         //CPU components
-        //---------------------------------------------------
         private Panel pnlControlUnit = new Panel();
         private Label lblControlUnit = new Label();
 
@@ -67,8 +70,6 @@ namespace CPU_Simulator
         private Label lblIR = new Label();
         private Label lblIRContents = new Label();
 
-        //GPRs and stack
-        //------------------------------------------------------------   
         private Panel[] pnlGPR = new Panel[Globals.NO_OF_GPR];
         private Label[] lblGPR = new Label[Globals.NO_OF_GPR];
         private Label[] lblGPRContents = new Label[Globals.NO_OF_GPR];
@@ -76,7 +77,6 @@ namespace CPU_Simulator
         private Panel pnlStack = new Panel();
         private Label[] lblStack = new Label[Globals.STACK_SIZE];
         private Label[] lblStackContents = new Label[Globals.STACK_SIZE];
-        //------------------------------------------------------------
 
         private Panel pnlMAR = new Panel();
         private Label lblMAR = new Label();
@@ -90,8 +90,7 @@ namespace CPU_Simulator
         private Panel pnlALU = new Panel();
         private Label lblALU = new Label();
 
-        //flags
-        //---------------------------------------------------                  
+        //flags               
         private Panel pnlFlags = new Panel();
         private Label lblFlags = new Label();
 
@@ -106,7 +105,6 @@ namespace CPU_Simulator
 
         private Label lblZero = new Label();
         private Label lblZeroContents = new Label();
-        //---------------------------------------------------
 
         private Panel pnlTMP = new Panel();
         private Label lblTMP = new Label();
@@ -118,10 +116,8 @@ namespace CPU_Simulator
         private Panel pnlAcc = new Panel();
         private Label lblAcc = new Label();
         private Label lblAccContents = new Label();
-        //---------------------------------------------------
 
         //draw methods
-        //-------------------------------------
         private void showWelcomeScreen()
         {
             ClientSize = new Size(230, 140);
@@ -188,6 +184,7 @@ namespace CPU_Simulator
                 Controls.Add(txtCodeEditor);
                 Controls.Add(btnLoadCode);
                 Controls.Add(btnSaveCode);
+                Controls.Add(btnShowInstructions);
 
                 Graphics drawTextBoxBorder = CreateGraphics();
                 Pen border = new Pen(Color.Black);
@@ -300,6 +297,15 @@ namespace CPU_Simulator
 
                 Controls.Add(txtCodeEditor);
 
+                btnShowInstructions.Text = "Supported Instructions";
+                btnShowInstructions.FlatStyle = FlatStyle.Popup;
+                btnShowInstructions.BackColor = Color.LightGray;
+                btnShowInstructions.Location = new Point(830, 445);
+                btnShowInstructions.Size = new Size(130, 25);
+                btnShowInstructions.Click += new EventHandler(btnShowInstructions_Click);
+
+                Controls.Add(btnShowInstructions);
+
                 btnLoadCode.Text = "Load";
                 btnLoadCode.FlatStyle = FlatStyle.Popup;
                 btnLoadCode.BackColor = Color.LightGray;
@@ -329,6 +335,7 @@ namespace CPU_Simulator
             Controls.Remove(txtCodeEditor);
             Controls.Remove(btnLoadCode);
             Controls.Remove(btnSaveCode);
+            Controls.Remove(btnShowInstructions);
         }
 
         private void drawRegisterCPU()
@@ -994,7 +1001,7 @@ namespace CPU_Simulator
             circuit.DrawLine(bus, 735, 182.5f, 760, 182.5f);
             circuit.DrawLine(bus, 735, 187.5f, 760, 187.5f);
 
-            if (registerSelected)
+            if (registerMachine)
             {
                 //GPR2
                 circuit.DrawLine(bus, 735, 242.5f, 760, 242.5f);
@@ -1012,16 +1019,14 @@ namespace CPU_Simulator
             circuit.Dispose();
             bus.Dispose();
         }
-        //-------------------------------------
 
         //control methods
-        //-------------------------------------
         private void btnRegister_Click(object sender, EventArgs e)
         {
             ClientSize = new Size(1137, 489);
             Text = "Register CPU Simulator";
 
-            registerSelected = true;
+            registerMachine = true;
 
             hideWelcomeScreen();
             drawRegisterCPU();
@@ -1033,7 +1038,7 @@ namespace CPU_Simulator
             ClientSize = new Size(1137, 489);
             Text = "Stack CPU Simulator";
 
-            registerSelected = false;
+            registerMachine = false;
 
             hideWelcomeScreen();
             drawStackCPU();
@@ -1043,10 +1048,10 @@ namespace CPU_Simulator
         private void btnStart_Click(object sender, EventArgs e)
         {
             //CPU is not active
-            if (CPUThread == null || CPUThread.ThreadState == ThreadState.Aborted || CPUThread.ThreadState == ThreadState.Stopped)
+            if (CPU == null || CPU.ThreadState == ThreadState.Aborted || CPU.ThreadState == ThreadState.Stopped)
             {
                 //CPU has previously run
-                if (CPUThread != null)
+                if (CPU != null)
                 {
                     CU.resetState();
                     resetComponents();
@@ -1054,21 +1059,21 @@ namespace CPU_Simulator
 
                     resetColours();
 
-                    if (CPUThread.ThreadState == ThreadState.Stopped)
+                    if (CPU.ThreadState == ThreadState.Stopped)
                         btnPauseStop.Text = "Pause";
                 }
 
                 if (compileAndRun())
                 {
-                    CPUThread = new Thread(new ThreadStart(CU.start));
-                    CPUThread.Start();
+                    CPU = new Thread(new ThreadStart(CU.start));
+                    CPU.Start();
                 }
             }
 
             //CPU is paused
-            else if (CPUThread.ThreadState == ThreadState.Suspended)
+            else if (CPU.ThreadState == ThreadState.Suspended)
             {
-                CPUThread.Resume();
+                CPU.Resume();
                 btnPauseStop.Text = "Pause";
             }
         }
@@ -1076,23 +1081,23 @@ namespace CPU_Simulator
         private void btnPauseStop_Click(object sender, EventArgs e)
         {
             //no thread active
-            if (CPUThread == null || 
-                CPUThread.ThreadState == ThreadState.Stopped)
+            if (CPU == null || 
+                CPU.ThreadState == ThreadState.Stopped)
                 MessageBox.Show("CPU not currently running.");
 
             //thread paused
-            else if (CPUThread.ThreadState == ThreadState.Suspended)
+            else if (CPU.ThreadState == ThreadState.Suspended)
             {
-                CPUThread.Resume();
-                CPUThread.Abort();
+                CPU.Resume();
+                CPU.Abort();
                 btnPauseStop.Text = "Stopped";
             }
 
             //thread active
-            else if (CPUThread.ThreadState == ThreadState.Running || 
-                CPUThread.ThreadState == ThreadState.WaitSleepJoin)
+            else if (CPU.ThreadState == ThreadState.Running || 
+                CPU.ThreadState == ThreadState.WaitSleepJoin)
             {
-                CPUThread.Suspend();
+                CPU.Suspend();
                 btnPauseStop.Text = "Stop";
             }
         }
@@ -1117,26 +1122,26 @@ namespace CPU_Simulator
         private void btnReturn_Click(object sender, EventArgs e)
         {
             //thread exists
-            if (CPUThread != null)
+            if (CPU != null)
             {
                 //thread running
-                if (CPUThread.ThreadState == ThreadState.Running ||
-                    CPUThread.ThreadState == ThreadState.WaitSleepJoin)
+                if (CPU.ThreadState == ThreadState.Running ||
+                    CPU.ThreadState == ThreadState.WaitSleepJoin)
                 {
-                    CPUThread.Abort();
+                    CPU.Abort();
                 }
 
                 //cannot abort suspended thread
-                else if (CPUThread.ThreadState == ThreadState.Suspended)
+                else if (CPU.ThreadState == ThreadState.Suspended)
                 {
-                    CPUThread.Resume();
-                    CPUThread.Abort();
+                    CPU.Resume();
+                    CPU.Abort();
                 }
             }
 
             hideUI();
 
-            if (registerSelected) hideRegisterCPU();
+            if (registerMachine) hideRegisterCPU();
             else hideStackCPU();
 
             Invalidate();
@@ -1161,6 +1166,12 @@ namespace CPU_Simulator
             }
         }
 
+        private void btnShowInstructions_Click(object sender, EventArgs e)
+        {
+            InstructionForm instructionTable = new InstructionForm(registerMachine);
+            instructionTable.Show();
+        }
+
         private void btnLoadCode_Click(object sender, EventArgs e)
         {
             //open file explorer and search for text files
@@ -1168,11 +1179,14 @@ namespace CPU_Simulator
             fileExplorer.ShowDialog();
 
             //load selected file into string
-            string program = System.IO.File.ReadAllText(fileExplorer.FileName);
+            if (fileExplorer.FileName != "")
+            {
+                string program = System.IO.File.ReadAllText(fileExplorer.FileName);
 
-            //load string into text box
-            txtCodeEditor.Text = program;
-            txtCodeEditor.ForeColor = Color.Black;
+                //load string into text box
+                txtCodeEditor.Text = program;
+                txtCodeEditor.ForeColor = Color.Black;
+            }
         }
 
         private void btnSaveCode_Click(object sender, EventArgs e)
@@ -1188,15 +1202,18 @@ namespace CPU_Simulator
             fileExplorer.ShowDialog();
 
             //write program to file selected
-            System.IO.File.WriteAllLines(fileExplorer.FileName, program);
+            if (fileExplorer.FileName != "")
+                System.IO.File.WriteAllLines(fileExplorer.FileName, program);
         }
-        //-------------------------------------
 
+        //loading methods
         private bool compileAndRun()
         {
             BitArray instruction = new BitArray(Globals.WORD_SIZE);
             string currentInstruction = "";
             bool compiled = true;
+
+            halt = false;
 
             //create empty program
             instructions = new BitArray[Globals.RAM_SIZE];
@@ -1251,9 +1268,15 @@ namespace CPU_Simulator
                 else compiled = false;
             }
 
+            if (!halt)
+            {
+                MessageBox.Show("No halt instruction used. Use 'HLT' after instruction you wish to stop at." );
+                compiled = false;
+            }
+
             if (compiled)
             {
-                if (registerSelected) loadRegisterCPU();
+                if (registerMachine) loadRegisterCPU();
                 else loadStackCPU();
             }
 
@@ -1264,26 +1287,52 @@ namespace CPU_Simulator
         {
             BitArray newInstruction = null;
             string opcode = "", parameters = "", fullInstruction = "";
+            bool parametersBinary = true;
 
             //get opcode
             for (int opcodeBit = 0; opcodeBit < instruction.Length && instruction[opcodeBit] != ' '; opcodeBit++)
-                opcode += instruction[opcodeBit];
+                    opcode += instruction[opcodeBit];
 
             //get parameters
             for (int addressBit = opcode.Length + 1; addressBit < instruction.Length; addressBit++)
-                if (instruction[addressBit] != ' ') parameters += instruction[addressBit];
+            {
+                if (instruction[addressBit] != ' ')
+                {
+                    if (instruction[addressBit] != '1' && instruction[addressBit] != '0')
+                        parametersBinary = false;
+
+                    parameters += instruction[addressBit];
+                }
+            }
 
             //valid opcode
-            if (Globals.keywords.ContainsKey(opcode))
+            if (parametersBinary && Globals.keywords.ContainsKey(opcode))
             {
-                //if parameters used they will be less than 4 bits
-                if (parameters.Length > Globals.GPR_ADDRESS_SIZE * 2)
-                    MessageBox.Show("Too many parameters provided at line: " + lineNo);
+                //parameters for load, store and jump if require 4 bits
+                if (parameters.Length != Globals.GPR_ADDRESS_SIZE * 2 && (registerMachine && (Globals.keywords[opcode] == Globals.OP_LOAD_POP || Globals.keywords[opcode] == Globals.OP_STORE_SWAP)) || Globals.keywords[opcode] == Globals.OP_JUMP_IF)
+                    MessageBox.Show("Incorrect number of parameters provided at line: " + lineNo);
+
+                //parameters for jump register and data only require register B (must fit within 2 bits)
+                else if (parameters.Length != Globals.GPR_ADDRESS_SIZE && (Globals.keywords[opcode] == Globals.OP_JUMP_RG_TOS || Globals.keywords[opcode] == Globals.OP_DATA_PUSH) && registerMachine)
+                    MessageBox.Show("Incorrect number of parameters provided at line: " + lineNo);
+
+                //no parameters required for stack CPU instructions (EXCEPT jump if)
+                //no parameters required for jump or reset on register CPU
+                else if (parameters.Length != 0 && (!registerMachine && Globals.keywords[opcode] != Globals.OP_JUMP_IF) || registerMachine && (Globals.keywords[opcode] == Globals.OP_JUMP || Globals.keywords[opcode] == Globals.OP_RESET_FLAGS))
+                    MessageBox.Show("Incorrect number of parameters provided at line: " + lineNo);
 
                 else
                 {
                     //initialise bitarray so instruction can be copied
                     newInstruction = new BitArray(Globals.WORD_SIZE);
+
+                    //put 2 0s in RGA for instructions that do not use it
+                    if (parameters.Length == Globals.GPR_ADDRESS_SIZE)
+                    {
+                        string blanks = "00";
+                        blanks += parameters;
+                        parameters = blanks;
+                    }
 
                     //combine opcode and parameters
                     fullInstruction = Globals.keywords[opcode] + parameters;
@@ -1301,8 +1350,13 @@ namespace CPU_Simulator
             else if (opcode == Globals.HALT)
             {
                 lastInstruction = lineNo - 1;
+                halt = true;
                 newInstruction = new BitArray(Globals.WORD_SIZE);
             }
+
+            //invalid parameters
+            else if (!parametersBinary)
+                MessageBox.Show("Invalid parameters: " + instruction + " at line " + lineNo + ". Instruction parameters must be in binary.");
 
             //invalid instruction
             else MessageBox.Show("Invalid opcode: " + opcode + " at line " + lineNo);
@@ -1330,7 +1384,16 @@ namespace CPU_Simulator
 
                 //copy input to bitarray
                 for (int inputBit = input.Length - 1, copyBit = Globals.WORD_SIZE - 1; inputBit >= 0; inputBit--, copyBit--)
+                {
                     if (input[inputBit] == '1') data[copyBit] = true;
+                    else if (input[inputBit] != '0')
+                    {
+                        MessageBox.Show("Invalid address/data: " + input + " at line " + lineNo + ". Must be in binary.");
+
+                        data = null;
+                        break;
+                    }
+                }
             }
 
             return data;
@@ -1355,14 +1418,14 @@ namespace CPU_Simulator
                 updateFlagRegister, resetColours);
         }
 
-        //PUBLIC
         public MainForm()
         {
+            FormBorderStyle = FormBorderStyle.FixedSingle;
+            MaximizeBox = false;
             showWelcomeScreen();
         }
 
         //CPU state changes
-        //-------------------------------------
         public void updateIARContents(BitArray address, bool accessMode)
         {
             if (InvokeRequired) Invoke(new ReadWriteRegister(updateIARContents), new object[] { address, accessMode });
@@ -2067,7 +2130,7 @@ namespace CPU_Simulator
                 lblEqualContents.ForeColor = Color.Black;
                 lblZeroContents.ForeColor = Color.Black;
 
-                if (registerSelected)
+                if (registerMachine)
                 {
                     for (int count = 0; count < Globals.NO_OF_GPR; count++)
                     {
@@ -2094,7 +2157,7 @@ namespace CPU_Simulator
                 pnlAcc.Refresh();
                 pnlFlags.Refresh();
 
-                if (registerSelected) drawRegisterCircuit();
+                if (registerMachine) drawRegisterCircuit();
                 else drawStackCircuit();
 
                 drawBus();
@@ -2135,7 +2198,7 @@ namespace CPU_Simulator
             lblZeroContents.ForeColor = Color.Red;
             lblZeroContents.Text = "0";
 
-            if (registerSelected)
+            if (registerMachine)
             {
                 for (int count = 0; count < Globals.NO_OF_GPR; count++)
                 {
@@ -2164,7 +2227,38 @@ namespace CPU_Simulator
             pnlAcc.Refresh();
             pnlFlags.Refresh();
         }
-        //-------------------------------------
+    }
+
+    public partial class InstructionForm : Form
+    {
+        private PictureBox instructionTable = new PictureBox();
+
+        public InstructionForm(bool registerMachine)
+        {
+            string image;
+
+            ClientSize = new Size(1000, 563);
+            Text = "Instructions";
+            MaximizeBox = false;
+            FormBorderStyle = FormBorderStyle.FixedSingle;
+
+            if (registerMachine) image = @"assets\register_table.png";
+            else image = @"assets\stack_table.png";
+
+            try
+            {
+                //load instruction table image
+                instructionTable.Image = new Bitmap(image);
+                instructionTable.Size = new Size(1000, 563);
+                instructionTable.SizeMode = PictureBoxSizeMode.StretchImage;
+                Controls.Add(instructionTable);
+            }
+
+            catch
+            {
+                MessageBox.Show("Could not load instruction table.");
+            }
+        }
     }
 
     public static class Globals
@@ -2172,7 +2266,6 @@ namespace CPU_Simulator
         public static int CLOCK_SPEED = 0;
 
         //instruction format
-        //---------------------------------------------------------------------------------------------------------------
         public const int WORD_SIZE = 8;
         public const int OPCODE_SIZE = WORD_SIZE / 2;
         public const int GPR_ADDRESS_SIZE = 2;
@@ -2208,23 +2301,17 @@ namespace CPU_Simulator
 
         //indexes of flags are reversed to support BitArray big endian format 
         public const int COUT_FLAG = 3, A_LARGER_FLAG = 2, EQUAL_FLAG = 1, ZERO_FLAG = 0; 
-        //---------------------------------------------------------------------------------------------------------------
 
         //available memory
-        //-------------------------------
         public const int RAM_SIZE = 256;
         public const int NO_OF_GPR = 4;
         public const int STACK_SIZE = 8;
         public const int NO_OF_FLAGS = 4;
-        //-------------------------------
 
         //access modes
-        //---------------------------------------------------------------------------------------------------------
         public static readonly Color WRITE_COLOR = Color.Red, READ_COLOR = Color.DodgerBlue, BUS_COLOR = Color.Red;
         public const bool REGISTER_READ = true, REGISTER_WRITE = false;
-        //---------------------------------------------------------------------------------------------------------
 
-        //methods
         public static BitArray reverseBitArray(BitArray data)
         {
             BitArray reversedData = new BitArray(data.Length);
@@ -2250,7 +2337,8 @@ namespace CPU_Simulator
             char[] result = new char[data.Length];
             
             //data should be displayed in little endian form
-            data = reverseBitArray(data);
+            data = reverseBitArray(data);   
+
             for (int count = 0; count < data.Length; count++)
             {
                 if (data[count]) result[count] = '1';
@@ -2281,11 +2369,9 @@ namespace CPU_Simulator
 
     public class Register
     {
-        //PRIVATE
-        private BitArray contents = new BitArray(Globals.WORD_SIZE);
-
-        //PUBLIC
         public event ReadWriteRegister ReadWriteContents;
+
+        private BitArray contents = new BitArray(Globals.WORD_SIZE);
 
         //no event assigned, used for registers that require specialised events (i.e. RAM and GPRs need an address)
         public Register() { }
@@ -2318,11 +2404,9 @@ namespace CPU_Simulator
 
     public class RAM
     {
-        //PRIVATE
-        private Register[] contents = new Register[Globals.RAM_SIZE];
-
-        //PUBLIC
         public event ReadWriteMemory ReadWriteContents;
+
+        private Register[] contents = new Register[Globals.RAM_SIZE];
 
         public RAM(BitArray[] instructions, ReadWriteMemory readWriteContents)
         {
@@ -2362,10 +2446,8 @@ namespace CPU_Simulator
 
     public class MAR : Register
     {
-        //PRIVATE
         private RAM RAM;
 
-        //PUBLIC
         public MAR(BitArray[] instructions, ReadWriteMemory readWriteRAM, ReadWriteRegister readWriteContents)
             : base(readWriteContents) { RAM = new RAM(instructions, readWriteRAM); }
 
@@ -2376,22 +2458,22 @@ namespace CPU_Simulator
 
     public class ALU
     {
-        //PRIVATE
-        private bool BUS1 = false;
+        public event ReadOnlyRegister ReadBUS1;         //indicate BUS1 active
+        public event ReadWriteFlags ReadWriteFlags;     //update flag with its new data (write), or indicate it is being accessed (read)
 
-        //PUBLIC
-        public event ReadOnlyRegister ReadBUS1;
-        public event ReadWriteFlags ReadWriteFlags;
+        private bool BUS1 = false;  //toggle BUS1 enabled state
+        public Register TMP;        //also TOS register (stack machine)
 
+        //flag registers
         public bool[] flags = new bool[Globals.NO_OF_FLAGS];
-        public Register TMP;
 
         public ALU(ReadWriteRegister readWriteTMP, ReadOnlyRegister readBUS1, ReadWriteFlags readWriteFlags)
         {
             TMP = new Register(readWriteTMP);
 
             //flags
-            for (int count = 0; count < Globals.NO_OF_FLAGS; count++) flags[count] = false;
+            for (int count = 0; count < Globals.NO_OF_FLAGS; count++)
+                flags[count] = false;
 
             ReadBUS1 += readBUS1;
             ReadWriteFlags += readWriteFlags;
@@ -2612,33 +2694,34 @@ namespace CPU_Simulator
 
     public class ControlUnit
     {
-        //PRIVATE
-        private bool registerMachine = false;                               //CPU to simulate (toggle register and stack)
-        private bool programFinished = false;                               //stop execution when true
+                                                        //GUI EVENTS
+        public event ReadWriteMemory ReadWriteGPR;      //update GPR with its new data (write), or indicate it is being accessed (read)
+        public event ReadWriteFlags ReadWriteFlags;     //same as above, but for flags
+        public event ALUOperation RunALUOperation;      //indicate type of operation being performed
+        public event RedrawGUI ResetControlBits;        //turn off all control bits (set, enable, opcodes) [invoke after each step of an instruction]
 
-        private BitArray opcode = new BitArray(Globals.OPCODE_SIZE);        //instruction to execute
-        private BitArray flagCondition = new BitArray(Globals.NO_OF_FLAGS); //parameters for a jump if
-        private byte registerA, registerB;                                  //address of GPRs in use by current instruction
+        public event ReadWriteStack PushPopStack;       //shifts all stack elements up (pop), or down (push)
+        public event ReadOnlyRegister ReadTOS;          //reading TOS using readContents() feeds its output to the ALU, this event outputs to the bus instead
+
+        private bool registerMachine = false;   //CPU to simulate (toggles register and stack)
+        private bool programFinished = false;   //stop execution when true
+
+        private BitArray opcode = new BitArray(Globals.OPCODE_SIZE);            //instruction to execute
+        private BitArray flagParameters = new BitArray(Globals.NO_OF_FLAGS);    //parameters for a jump if
+        private byte registerA, registerB;                                      //address of GPRs in use by current instruction (register machine only)
+        
+        //tracks the last executable instruction in memory
+        public readonly BitArray lastInstruction = new BitArray(Globals.WORD_SIZE);
 
         private ALU ALU;
 
+        //SPRs
         private MAR MAR;
         private Register IAR, IR, ACC;
 
+        //local memory
         private Register[] GPR = new Register[Globals.NO_OF_GPR];
         private Register[] stack = new Register[Globals.STACK_SIZE];
-
-        //PUBLIC
-        public event ReadWriteMemory ReadWriteGPR;      //when invoked, GUI will update GPR with its new data (write), or indicate it is being accessed (read)
-        public event ReadWriteFlags ReadWriteFlags;     //same as above, but for flags
-        public event ALUOperation RunALUOperation;      //the ALU opcode bits will pass to the ALU opcode wires on the GUI
-        public event RedrawGUI ResetControlBits;        //GUI will turn off all control bits (set, enable, opcodes)
-
-        public event ReadWriteStack PushPopStack;       //when invoked, GUI will shift all stack elements up (pop) or down (push)
-        public event ReadOnlyRegister ReadTOS;          //reading TOS using readContents() feeds its output to the ALU, this event outputs to the bus instead
-
-        //tracks the last executable instruction in memory
-        public readonly BitArray lastInstruction = new BitArray(Globals.WORD_SIZE);
 
         //initialise all CPU components for register machine
         public ControlUnit                                                                                                  
@@ -2650,7 +2733,6 @@ namespace CPU_Simulator
             registerMachine = true;
 
             //create new instance of each component
-            //------------------------------------------------------
             ALU = new ALU(readWriteTMP, readBUS1, readWriteFlags);
             ACC = new Register(readWriteAcc);
             MAR = new MAR(instructions, readWriteRAM, readWriteMAR);
@@ -2660,17 +2742,14 @@ namespace CPU_Simulator
             //GPRs
             for (int count = 0; count < Globals.NO_OF_GPR; count++)
                 GPR[count] = new Register();
-            //------------------------------------------------------
 
             this.lastInstruction = new BitArray(lastInstruction);
 
             //link methods to events
-            //-----------------------------------
-            ReadWriteGPR += readWriteGPR;           //invoke when the CPU needs to read or write data to a GPR
-            ReadWriteFlags += readWriteFlags;       //same as above, but for a flag
-            RunALUOperation += runALUOperation;     //invoke when the CPU runs an ALU instruction
-            ResetControlBits += resetControlBits;   //invoke at the end of an instruction step (i.e. writing to a register, resetting flags etc.)
-            //-----------------------------------
+            ReadWriteGPR += readWriteGPR;        
+            ReadWriteFlags += readWriteFlags;    
+            RunALUOperation += runALUOperation;  
+            ResetControlBits += resetControlBits;
         }
 
         //initialise all CPU components for stack machine
@@ -2684,7 +2763,6 @@ namespace CPU_Simulator
             registerMachine = false;
 
             //create new instance of each component
-            //------------------------------------------------------
             ALU = new ALU(readWriteTOS, readBUS1, readWriteFlags);
             ACC = new Register(readWriteAcc);
             MAR = new MAR(instructions, readWriteRAM, readWriteMAR);
@@ -2697,18 +2775,16 @@ namespace CPU_Simulator
                 if (count == 0) stack[count] = new Register(readWriteStack);    //top element can invoke read/write event
                 else stack[count] = new Register();
             }
-            //------------------------------------------------------
 
             this.lastInstruction = new BitArray(lastInstruction);
 
             //link methods to events
-            //-----------------------------------
-            PushPopStack += pushPopStack;           //invoke when the CPU needs to push or pop data from the stack
-            ReadTOS += readTOS;                     //invoke to read TOS onto the bus instead of the ALU
-            ReadWriteFlags += readWriteFlags;       //invoke when the CPU needs to read or write from a flag
-            RunALUOperation += runALUOperation;     //invoke when the CPU runs an ALU instruction
-            ResetControlBits += resetControlBits;   //invoke at the end of an instruction step (i.e. writing to a register, resetting flags etc.)
-            //-----------------------------------
+
+            PushPopStack += pushPopStack;        
+            ReadTOS += readTOS;                  
+            ReadWriteFlags += readWriteFlags;    
+            RunALUOperation += runALUOperation;  
+            ResetControlBits += resetControlBits;
         }
 
         public void start()
@@ -2722,7 +2798,8 @@ namespace CPU_Simulator
                 ALU.TMP.setContents();
                 ACC.setContents();
 
-                for (int count = 0; count < Globals.NO_OF_FLAGS; count++) ALU.flags[count] = false;
+                for (int count = 0; count < Globals.NO_OF_FLAGS; count++)
+                    ALU.flags[count] = false;
 
                 if (registerMachine)
                 {
@@ -2762,7 +2839,8 @@ namespace CPU_Simulator
         //point MAR to instruction to execute
         private void prepareInstruction()
         {
-            MAR.overwriteContents(IAR.readContents());          //copy next instruction address to MAR
+            //copy next instruction address to MAR
+            MAR.overwriteContents(IAR.readContents());          
             ResetControlBits?.Invoke();                         
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
@@ -2770,9 +2848,8 @@ namespace CPU_Simulator
         //point IAR to next instruction
         private void incrementIAR()
         {
-            //IAR is at last executable instruction, program will finish after this instruction
-            if (Globals.areBitsEqual(IAR.getContents(), lastInstruction))
-                programFinished = true;
+            //IAR is at last instruction, program will finish after executing
+            if (Globals.areBitsEqual(IAR.getContents(), lastInstruction)) programFinished = true;
 
             ALU.toggleBUS1();                                   //enable BUS1 (ALU input B becomes 1)
             ACC.overwriteContents(ALU.add(IAR.readContents())); //add IAR and B (increments value by 1)
@@ -2781,8 +2858,8 @@ namespace CPU_Simulator
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
-            IAR.overwriteContents(ACC.readContents());          //update IAR with new value
-
+            //update IAR with new value
+            IAR.overwriteContents(ACC.readContents());          
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
@@ -2792,7 +2869,6 @@ namespace CPU_Simulator
         {
             //access next instruction in memory and copy to IR
             IR.overwriteContents(MAR.readFromMemory());         
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
@@ -2820,7 +2896,7 @@ namespace CPU_Simulator
             {
                 //splice flag parameters from instruction
                 for (int currentBit = 0; currentBit < Globals.NO_OF_FLAGS; currentBit++)
-                    flagCondition[currentBit] = IR[currentBit];
+                    flagParameters[currentBit] = IR[currentBit];
             }
 
             //non opcode bits GPR addresses
@@ -2846,11 +2922,8 @@ namespace CPU_Simulator
             string opcodeAsString = Globals.convertBitsToString(opcode);
 
             //ALU opcode bit active, is an ALU instruction
-            //--------------------------------------------------------------------------------------------------------------------------
             if (opcode[Globals.ALU_OPCODE])
             {
-                //run ALU operation and provide contents of register A as input
-                //-------------------------------------------------------------------------------------------
                 RunALUOperation?.Invoke(opcode);
 
                 //register specific ALU instructions
@@ -2861,7 +2934,6 @@ namespace CPU_Simulator
                     {
                         ReadWriteGPR?.Invoke(GPR[registerB].getContents(), registerB, Globals.REGISTER_READ);   //invoke GPR read
                         ALU.TMP.overwriteContents(GPR[registerB].readContents());                               //copy register B to TMP
-
                         ResetControlBits?.Invoke();
                         if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
@@ -2925,7 +2997,6 @@ namespace CPU_Simulator
                         GPR[registerB].overwriteContents(ACC.readContents());
                         ReadWriteGPR?.Invoke(GPR[registerB].getContents(), registerB, Globals.REGISTER_WRITE);
                         Thread.Sleep(Globals.CLOCK_SPEED);
-
                         ResetControlBits?.Invoke();
                         if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
                     }
@@ -2986,12 +3057,9 @@ namespace CPU_Simulator
                         push(ACC);
                     }
                 }
-                //-------------------------------------------------------------------------------------------
             }
-            //--------------------------------------------------------------------------------------------------------------------------
 
             //control unit instruction
-            //--------------------------------------------------------------------
             else
             {
                 switch (opcodeAsString)
@@ -3032,19 +3100,15 @@ namespace CPU_Simulator
                         //IO
                         break;
                 }
-                //--------------------------------------------------------------------
             }
         }
 
         //REGISTER
-        //--------------------------------------------------------------------------------
-        //save data to register B, data located in RAM by register A
         private void load()
         {
             //prep MAR with address in register A
             ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
             MAR.overwriteContents(GPR[registerA].readContents());
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
@@ -3052,35 +3116,29 @@ namespace CPU_Simulator
             GPR[registerB].overwriteContents(MAR.readFromMemory());
             ReadWriteGPR?.Invoke(GPR[registerB].getContents(), registerB, Globals.REGISTER_WRITE);
             Thread.Sleep(Globals.CLOCK_SPEED);
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
-
-        //save data to RAM, location specified by register A, data specified by register B
+        
         private void store()
         {
             //prep MAR with address in register A
             ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
             MAR.overwriteContents(GPR[registerA].readContents());
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
             //copy data from register B to memory
             ReadWriteGPR?.Invoke(GPR[registerB].getContents(), registerB, Globals.REGISTER_READ);
             MAR.writeToMemory(GPR[registerB].readContents());
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
 
-        //save data to register B, data located in next RAM address
         private void data()
         {
             //prep MAR with address in IAR
             MAR.overwriteContents(IAR.readContents());
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
@@ -3091,31 +3149,24 @@ namespace CPU_Simulator
             GPR[registerB].overwriteContents(MAR.readFromMemory());
             ReadWriteGPR?.Invoke(GPR[registerB].getContents(), registerB, Globals.REGISTER_WRITE);
             Thread.Sleep(Globals.CLOCK_SPEED);
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
 
-        //jump to address stored in register B
         private void jumpRegister()
         {
             //copy register B to IAR
             ReadWriteGPR?.Invoke(GPR[registerB].getContents(), registerB, Globals.REGISTER_READ);
             IAR.overwriteContents(GPR[registerB].readContents());
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
-        //--------------------------------------------------------------------------------
 
         //STACK
-        //--------------------------------------------------------------------------------
-        //pop data into location at next instruction address - pop without saving if blank
         private void pop()
         {
             //prep MAR with address in IAR
             MAR.overwriteContents(IAR.readContents());
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
@@ -3125,7 +3176,7 @@ namespace CPU_Simulator
             //get location to pop data into and prep into MAR
             BitArray addressToPop = MAR.readFromMemory(false);
 
-            //check if address is blank
+            //check if address provided
             bool isBlank = true;
             for (int count = 0; count < Globals.WORD_SIZE; count++)     
             {
@@ -3141,14 +3192,12 @@ namespace CPU_Simulator
             {
                 //prep memory for write
                 MAR.overwriteContents(addressToPop);
-
                 ResetControlBits?.Invoke();
                 if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
                 //write data in TOS to memory
                 ReadTOS?.Invoke();
                 MAR.writeToMemory(ALU.TMP.getContents());
-
                 ResetControlBits?.Invoke();
                 if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
             }
@@ -3167,34 +3216,28 @@ namespace CPU_Simulator
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
 
-        //swap contents of TOS register with top of stack
         private void swap()
         {
             //copy TOS to ACC
             ACC.overwriteContents(ALU.TMP.readContents());     
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
             //copy top of stack into TOS
             ALU.TMP.overwriteContents(stack[0].readContents()); 
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
             //copy ACC to top of stack
             stack[0].overwriteContents(ACC.readContents());      
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
 
-        //fetch data at next instruction address, push into the stack
         private void push()
         {
             //prep MAR with address in IAR
             MAR.overwriteContents(IAR.readContents());
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
@@ -3213,18 +3256,15 @@ namespace CPU_Simulator
             stack[0].setContents(ALU.TMP.getContents());
             PushPopStack?.Invoke(Globals.REGISTER_WRITE, 0);
             Thread.Sleep(Globals.CLOCK_SPEED);
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
             //push new data into TOS
             ALU.TMP.overwriteContents(MAR.readFromMemory());
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
 
-        //push data provided (used to push data not from memory, e.g. from ACC after ALU operation)
         private void push(Register register)
         {
             //start from the bottom and copy data from element above to current element
@@ -3239,68 +3279,59 @@ namespace CPU_Simulator
             stack[0].setContents(ALU.TMP.getContents());
             PushPopStack?.Invoke(Globals.REGISTER_WRITE, 0);
             Thread.Sleep(Globals.CLOCK_SPEED);
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
             //push new data into TOS
             ALU.TMP.overwriteContents(register.readContents());
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
 
-        //jump to address stored in TOS
         private void jumpTOS()
         {
             //copy TOS to IAR
             ReadTOS?.Invoke();
             IAR.overwriteContents(ALU.TMP.getContents());
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
-        //--------------------------------------------------------------------------------
-
+        
         //ALL
-        //--------------------------------------------------------------------------------
-        //jump to address stored in next memory location
         private void jump()
         {
             //prep MAR with address in IAR
             MAR.overwriteContents(IAR.readContents());
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
             //copy next address to IAR
             IAR.overwriteContents(MAR.readFromMemory());
-
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
 
-        //jump to address stored in next memory location if condition is met
         private void jumpIf()
         {
-            if (flagCondition.Length == Globals.NO_OF_FLAGS)
+            if (flagParameters.Length == Globals.NO_OF_FLAGS)
             {
                 bool conditionmet = true;
 
                 //invoke flag read event
                 ReadWriteFlags?.Invoke(Globals.REGISTER_READ);
                 Thread.Sleep(Globals.CLOCK_SPEED);
-
                 ResetControlBits?.Invoke();
                 if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
-                //compare state of flags with condition
+                //compare state of flags with parameters
                 for (int count = 0; count < Globals.NO_OF_FLAGS && conditionmet; count++)
-                    if (flagCondition[count] && !ALU.flags[count] || !flagCondition[count] && ALU.flags[count])
+                {
+                    if (flagParameters[count] != ALU.flags[count])
                         conditionmet = false;
+                }
 
-                if (conditionmet) jump();
-                else incrementIAR();        //step over jump address
+                if (conditionmet) jump();   //jump to specified instruction
+                else incrementIAR();        //step over to next instruction
             }
 
             else MessageBox.Show("Invalid condition");
@@ -3311,13 +3342,12 @@ namespace CPU_Simulator
             //flag reset event
             ReadWriteFlags?.Invoke(Globals.REGISTER_WRITE);
             Thread.Sleep(Globals.CLOCK_SPEED);
-
             ResetControlBits?.Invoke();
-            Thread.Sleep(Globals.CLOCK_SPEED);
+            if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
             //set all flags to 0
-            for (int count = 0; count < Globals.NO_OF_FLAGS; count++) ALU.flags[count] = false;
+            for (int count = 0; count < Globals.NO_OF_FLAGS; count++)
+                ALU.flags[count] = false;
         }
-        //--------------------------------------------------------------------------------
     }
 }

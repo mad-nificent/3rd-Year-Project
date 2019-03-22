@@ -19,7 +19,15 @@
 
         #region Windows Form Designer generated code
 
-        private void InitializeComponent() {}
+        private void InitializeComponent() {            this.SuspendLayout();
+            // 
+            // MainForm
+            // 
+            this.ClientSize = new System.Drawing.Size(284, 261);
+            this.Name = "MainForm";
+            this.ResumeLayout(false);
+
+}
 
         #endregion
     }
