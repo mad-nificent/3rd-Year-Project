@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
@@ -22,7 +23,9 @@ namespace CPU_Simulator
         private Thread CPUThread;
         private ControlUnit CU;
 
-        private bool registerSelected = false;
+        private bool registerSelected;
+        BitArray[] instructions;
+        int lastInstruction;
 
         //indicates if a quick redraw can be done
         private bool welcomeScreenDrawn = false;
@@ -1023,8 +1026,6 @@ namespace CPU_Simulator
             hideWelcomeScreen();
             drawRegisterCPU();
             drawUI();
-
-            loadRegisterCPU();
         }
 
         private void btnStack_Click(object sender, EventArgs e)
@@ -1037,57 +1038,38 @@ namespace CPU_Simulator
             hideWelcomeScreen();
             drawStackCPU();
             drawUI();
-
-            loadStackCPU();
         }
 
         private void btnStart_Click(object sender, EventArgs e)
         {
-            //no thread
-            if (CPUThread == null)
+            //CPU is not active
+            if (CPUThread == null || CPUThread.ThreadState == ThreadState.Aborted || CPUThread.ThreadState == ThreadState.Stopped)
             {
-                CPUThread = new Thread(new ThreadStart(CU.start));
-                CPUThread.Start();
+                //CPU has previously run
+                if (CPUThread != null)
+                {
+                    CU.resetState();
+                    resetComponents();
+                    Thread.Sleep(Globals.CLOCK_SPEED);
+
+                    resetColours();
+
+                    if (CPUThread.ThreadState == ThreadState.Stopped)
+                        btnPauseStop.Text = "Pause";
+                }
+
+                if (compileAndRun())
+                {
+                    CPUThread = new Thread(new ThreadStart(CU.start));
+                    CPUThread.Start();
+                }
             }
 
-            //thread paused
+            //CPU is paused
             else if (CPUThread.ThreadState == ThreadState.Suspended)
             {
                 CPUThread.Resume();
                 btnPauseStop.Text = "Pause";
-            }
-
-            //thread stopped
-            else if (CPUThread.ThreadState == ThreadState.Aborted)
-            {
-                //CPU will reset on thread start
-                CU.triggerRestart();    
-
-                //reset GUI
-                resetCPU();             
-                Thread.Sleep(Globals.CLOCK_SPEED);
-
-                resetColours();
-
-                CPUThread = new Thread(new ThreadStart(CU.start));
-                CPUThread.Start();
-                btnPauseStop.Text = "Pause";
-            }
-
-            //thread finished
-            else if (CPUThread.ThreadState == ThreadState.Stopped)
-            {
-                //CPU will reset on thread start
-                CU.triggerRestart();
-
-                //reset GUI
-                resetCPU();
-                Thread.Sleep(Globals.CLOCK_SPEED);
-
-                resetColours();
-                
-                CPUThread = new Thread(new ThreadStart(CU.start));
-                CPUThread.Start();
             }
         }
 
@@ -1181,102 +1163,183 @@ namespace CPU_Simulator
 
         private void btnLoadCode_Click(object sender, EventArgs e)
         {
-            //todo
+            //open file explorer and search for text files
+            OpenFileDialog fileExplorer = new OpenFileDialog() { Filter = "Text files (*.txt)|*.txt" };
+            fileExplorer.ShowDialog();
+
+            //load selected file into string
+            string program = System.IO.File.ReadAllText(fileExplorer.FileName);
+
+            //load string into text box
+            txtCodeEditor.Text = program;
+            txtCodeEditor.ForeColor = Color.Black;
         }
 
         private void btnSaveCode_Click(object sender, EventArgs e)
         {
-            //todo
+            string[] program = new string[txtCodeEditor.Lines.Length];
+
+            //read each line in text box
+            for (int currentLine = 0; currentLine < program.Length; currentLine++)
+                program[currentLine] = txtCodeEditor.Lines[currentLine];
+
+            //open file explorer to save a text file
+            SaveFileDialog fileExplorer = new SaveFileDialog() { Filter = "Text files (*.txt)|*.txt" };
+            fileExplorer.ShowDialog();
+
+            //write program to file selected
+            System.IO.File.WriteAllLines(fileExplorer.FileName, program);
         }
         //-------------------------------------
 
+        private bool compileAndRun()
+        {
+            BitArray instruction = new BitArray(Globals.WORD_SIZE);
+            string currentInstruction = "";
+            bool compiled = true;
+
+            //create empty program
+            instructions = new BitArray[Globals.RAM_SIZE];
+
+            //read each line of text box until the end or there is a problem
+            for (int currentLine = 0; currentLine < txtCodeEditor.Lines.Length && compiled; currentLine++)
+            {
+                currentInstruction = txtCodeEditor.Lines[currentLine];  //get current instruction
+
+                //check if written as binary
+                bool isBinary = true;
+                for (int currentBit = 0; currentBit < currentInstruction.Length; currentBit++)
+                {
+                    if (currentInstruction[currentBit] != '0' && currentInstruction[currentBit] != '1')
+                        isBinary = false;
+                }
+
+                //instruction is binary, convert to bitarray
+                if (isBinary)
+                {
+                    //small enough to fit in memory
+                    if (currentInstruction.Length <= Globals.WORD_SIZE)
+                    {
+                        //fill remaining bits as 0s
+                        if (currentInstruction.Length < Globals.WORD_SIZE)
+                        {
+                            string blanks = "";
+                            for (int currentBit = currentInstruction.Length; currentBit < Globals.WORD_SIZE; currentBit++)
+                                blanks += '0';
+
+                            blanks += currentInstruction;   //put 0s before value
+                            currentInstruction = blanks;    //copy to instruction
+                        }
+
+                        instruction = Globals.convertStringToBits(currentInstruction);
+                    }
+
+                    else
+                    {
+                        MessageBox.Show("Instruction at line: " + currentLine + " is larger than the supported size.");
+                        compiled = false;
+                    }
+                }
+
+                else isBinary = false;
+
+                //convert assembly to binary
+                if (!isBinary) instruction = convertToBinary(currentInstruction, currentLine);     
+
+                //add instruction to program
+                if (instruction != null) instructions[currentLine] = instruction;   
+                else compiled = false;
+            }
+
+            if (compiled)
+            {
+                if (registerSelected) loadRegisterCPU();
+                else loadStackCPU();
+            }
+
+            return compiled;
+        }
+
+        private BitArray convertToBinary(string instruction, int lineNo)
+        {
+            BitArray newInstruction = null;
+            string opcode = "", parameters = "", fullInstruction = "";
+
+            //get opcode
+            for (int opcodeBit = 0; opcodeBit < instruction.Length && instruction[opcodeBit] != ' '; opcodeBit++)
+                opcode += instruction[opcodeBit];
+
+            //get parameters
+            for (int addressBit = opcode.Length + 1; addressBit < instruction.Length; addressBit++)
+                if (instruction[addressBit] != ' ') parameters += instruction[addressBit];
+
+            //valid opcode
+            if (Globals.keywords.ContainsKey(opcode))
+            {
+                //if parameters used they will be less than 4 bits
+                if (parameters.Length > Globals.GPR_ADDRESS_SIZE * 2)
+                    MessageBox.Show("Too many parameters provided at line: " + lineNo);
+
+                else
+                {
+                    //initialise bitarray so instruction can be copied
+                    newInstruction = new BitArray(Globals.WORD_SIZE);
+
+                    //combine opcode and parameters
+                    fullInstruction = Globals.keywords[opcode] + parameters;
+
+                    //convert full instruction to bitarray
+                    for (int currentBit = 0; currentBit < Globals.WORD_SIZE && currentBit < fullInstruction.Length; currentBit++)
+                        if (fullInstruction[currentBit] == '1') newInstruction[currentBit] = true;
+                }
+            }
+
+            //line is an address or data
+            else if (opcode == Globals.ADDRESS || opcode == Globals.DATA) newInstruction = parseData(lineNo, parameters);
+
+            //line is a halt
+            else if (opcode == Globals.HALT)
+            {
+                lastInstruction = lineNo - 1;
+                newInstruction = new BitArray(Globals.WORD_SIZE);
+            }
+
+            //invalid instruction
+            else MessageBox.Show("Invalid opcode: " + opcode + " at line " + lineNo);
+
+            if (newInstruction != null) return Globals.reverseBitArray(newInstruction);
+            else return null;
+        }
+
+        private BitArray parseData(int lineNo, string input)
+        {
+            BitArray data = null;
+
+            //cannot be more than 8 bits
+            if (input.Length > Globals.WORD_SIZE)
+                MessageBox.Show("Invalid address/data: " + input + " at line " + lineNo + ". Must be 8 digits or less.");
+
+            //cannot be first instruction
+            else if (lineNo == 0)
+                MessageBox.Show("Invalid address/data: " + input + " at line " + lineNo + ". Cannot be first instruction.");
+
+            else
+            {
+                //initialise bitarray so instruction can be copied
+                data = new BitArray(Globals.WORD_SIZE);
+
+                //copy input to bitarray
+                for (int inputBit = input.Length - 1, copyBit = Globals.WORD_SIZE - 1; inputBit >= 0; inputBit--, copyBit--)
+                    if (input[inputBit] == '1') data[copyBit] = true;
+            }
+
+            return data;
+        }
+
         private void loadRegisterCPU()
         {
-            //------------------------------------------------------------------------------------------------------------
-            //                                                        opcode            |  register A   |  register B
-            //--------------------------------------------------------------------------|---------------|-----------------
-            //BitArray load     = new BitArray(new bool[] { false, false, false, false, | false, false, | false, false });
-            //BitArray store    = new BitArray(new bool[] { false, false, false, true,  | false, false, | false, false });
-            //BitArray data     = new BitArray(new bool[] { false, false, true,  false, | false, false, | false, false });
-            //BitArray jumpRG   = new BitArray(new bool[] { false, false, true,  true,  | false, false, | false, false });
-            //BitArray jump     = new BitArray(new bool[] { false, true,  false, false, | false, false, | false, false });
-            //--------------------------------------------------------------------------|---------------------------------
-            //                                                        opcode            |  COUT |  A >  |   =   |  0
-            //BitArray jumpIf   = new BitArray(new bool[] { false, true,  false, true,  | false, false, | false, false });
-            //--------------------------------------------------------------------------|---------------------------------
-            //BitArray resetFlg = new BitArray(new bool[] { false, true,  true,  false, | false, false, | false, false });
-            //BitArray IO       = new BitArray(new bool[] { false, true,  true,  true,  | false, false, | false, false });
-            //--------------------------------------------------------------------------|---------------|-----------------
-            //BitArray add      = new BitArray(new bool[] { true,  false, false, false, | false, false, | false, false });
-            //BitArray rShift   = new BitArray(new bool[] { true,  false, false, true,  | false, false, | false, false });
-            //BitArray lShift   = new BitArray(new bool[] { true,  false, true,  false, | false, false, | false, false });
-            //BitArray not      = new BitArray(new bool[] { true,  false, true,  true,  | false, false, | false, false });
-            //BitArray and      = new BitArray(new bool[] { true,  true,  false, false, | false, false, | false, false });
-            //BitArray or       = new BitArray(new bool[] { true,  true,  false, true,  | false, false, | false, false });
-            //BitArray xor      = new BitArray(new bool[] { true,  true,  true,  false, | false, false, | false, false });
-            //BitArray compare  = new BitArray(new bool[] { true,  true,  true,  true,  | false, false, | false, false });
-            //-------------------------------------------------------------------------------------------------------------
-
-            //instructions
-            BitArray empty = new BitArray(new bool[] { false, false, false, false, false, false, false, false });
-
-            BitArray inputA = new BitArray(new bool[] { true, true, true, true, true, true, true, true });
-            BitArray inputB = new BitArray(new bool[] { true, false, false, false, false, false, false, true });
-            BitArray inputC = new BitArray(new bool[] { false, true, true, true, true, true, true, false });
-            BitArray address = new BitArray(new bool[] { false, false, false, false, true, false, false, false });
-
-            BitArray load = new BitArray(new bool[] { false, false, false, false, false, false, false, true });
-            BitArray store = new BitArray(new bool[] { false, false, false, true, false, false, false, true });
-            BitArray dataIntoReg1 = new BitArray(new bool[] { false, false, true, false, false, false, false, false });
-            BitArray dataIntoReg2 = new BitArray(new bool[] { false, false, true, false, false, false, false, true });
-            BitArray dataIntoReg3 = new BitArray(new bool[] { false, false, true, false, false, false, true, false });
-            BitArray dataIntoReg4 = new BitArray(new bool[] { false, false, true, false, false, false, true, true });
-            BitArray jumpRG = new BitArray(new bool[] { false, false, true, true, false, false, false, false });
-            BitArray jump = new BitArray(new bool[] { false, true, false, false, false, false, false, false });
-            BitArray jumpIf = new BitArray(new bool[] { false, true, false, true, true, false, false, false });
-            BitArray resetFlg = new BitArray(new bool[] { false, true, true, false, false, false, false, false });
-
-            BitArray add = new BitArray(new bool[] { true, false, false, false, false, false, false, true });
-            BitArray rShift = new BitArray(new bool[] { true, false, false, true, false, false, false, true });
-            BitArray lShift = new BitArray(new bool[] { true, false, true, false, false, false, false, true });
-            BitArray not = new BitArray(new bool[] { true, false, true, true, false, false, false, true });
-            BitArray and = new BitArray(new bool[] { true, true, false, false, false, false, false, true });
-            BitArray or = new BitArray(new bool[] { true, true, false, true, false, false, false, true });
-            BitArray xor = new BitArray(new bool[] { true, true, true, false, false, false, false, true });
-            BitArray compare = new BitArray(new bool[] { true, true, true, true, false, false, false, true });
-
-            address = Globals.reverseBitArray(address);
-            inputA = Globals.reverseBitArray(inputA);
-            inputB = Globals.reverseBitArray(inputB);
-            inputC = Globals.reverseBitArray(inputC);
-
-            load = Globals.reverseBitArray(load);
-            store = Globals.reverseBitArray(store);
-            dataIntoReg1 = Globals.reverseBitArray(dataIntoReg1);
-            dataIntoReg2 = Globals.reverseBitArray(dataIntoReg2);
-            dataIntoReg3 = Globals.reverseBitArray(dataIntoReg3);
-            dataIntoReg4 = Globals.reverseBitArray(dataIntoReg4);
-            jumpRG = Globals.reverseBitArray(jumpRG);
-            jump = Globals.reverseBitArray(jump);
-            jumpIf = Globals.reverseBitArray(jumpIf);
-            resetFlg = Globals.reverseBitArray(resetFlg);
-
-            add = Globals.reverseBitArray(add);
-            rShift = Globals.reverseBitArray(rShift);
-            lShift = Globals.reverseBitArray(lShift);
-            not = Globals.reverseBitArray(not);
-            and = Globals.reverseBitArray(and);
-            or = Globals.reverseBitArray(or);
-            xor = Globals.reverseBitArray(xor);
-            compare = Globals.reverseBitArray(compare);
-
-            byte[] lastAddress = { 2 };
-
-            //set instructions to load
-            BitArray[] instructions = new BitArray[] { dataIntoReg1, inputB, lShift };
-
             //link GUI events to CPU registers
-            CU = new ControlUnit(instructions, accessRAMLocation, lastAddress,
+            CU = new ControlUnit(instructions, accessRAMLocation, new byte[] { (byte)lastInstruction },
                 accessGPRContents, updateIARContents, updateIRContents, updateMARContents,
                 updateTMPContents, readBUS1, accessALU, updateAccumulatorContents,
                 updateFlagRegister, resetColours);
@@ -1284,91 +1347,8 @@ namespace CPU_Simulator
 
         private void loadStackCPU()
         {
-            //-------------------------------------------------------------------------------------------------------------
-            //                                                        opcode            |             BLANK
-            //--------------------------------------------------------------------------|---------------|------------------
-            //BitArray pop*     = new BitArray(new bool[] { false, false, false, false, | false, false, | false, false });
-            //BitArray swap     = new BitArray(new bool[] { false, false, false, true,  | false, false, | false, false });
-            //BitArray push*    = new BitArray(new bool[] { false, false, true,  false, | false, false, | false, false });
-            //BitArray jumpTOS  = new BitArray(new bool[] { false, false, true,  true,  | false, false, | false, false });
-            //BitArray jump*    = new BitArray(new bool[] { false, true,  false, false, | false, false, | false, false });
-            //--------------------------------------------------------------------------|---------------------------------
-            //                                                        opcode            |   0   |  A >  |   =   | COUT
-            //BitArray jumpIf * = new BitArray(new bool[] { false, true,  false, true,  | false, false, | false, false });
-            //--------------------------------------------------------------------------|---------------------------------
-            //BitArray resetFlg = new BitArray(new bool[] { false, true,  true,  false, | false, false, | false, false });
-            //BitArray IO       = new BitArray(new bool[] { false, true,  true,  true,  | false, false, | false, false });
-            //--------------------------------------------------------------------------|---------------|-----------------
-            //* INDICATES ADDRESS/DATA SHOULD BE PROVIDED AT NEXT INSTRUCTION ADDRESS
-            //--------------------------------------------------------------------------|---------------|-----------------
-            //BitArray add      = new BitArray(new bool[] { true,  false, false, false, | false, false, | false, false });
-            //BitArray rShift   = new BitArray(new bool[] { true,  false, false, true,  | false, false, | false, false });
-            //BitArray lShift   = new BitArray(new bool[] { true,  false, true,  false, | false, false, | false, false });
-            //BitArray not      = new BitArray(new bool[] { true,  false, true,  true,  | false, false, | false, false });
-            //BitArray and      = new BitArray(new bool[] { true,  true,  false, false, | false, false, | false, false });
-            //BitArray or       = new BitArray(new bool[] { true,  true,  false, true,  | false, false, | false, false });
-            //BitArray xor      = new BitArray(new bool[] { true,  true,  true,  false, | false, false, | false, false });
-            //BitArray compare  = new BitArray(new bool[] { true,  true,  true,  true,  | false, false, | false, false });
-            //-------------------------------------------------------------------------------------------------------------
-
-            //instructions, template above
-            BitArray empty = new BitArray(new bool[] { false, false, false, false, false, false, false, false });
-
-            BitArray address = new BitArray(new bool[] { false, false, false, false, false, true, true, true });
-            BitArray inputA = new BitArray(new bool[] { true, true, true, true, true, true, true, true });
-            BitArray inputB = new BitArray(new bool[] { false, false, false, false, false, false, false, true });
-            BitArray inputC = new BitArray(new bool[] { true, true, true, true, false, false, false, false });
-            BitArray inputD = new BitArray(new bool[] { false, false, false, false, true, true, true, true });
-
-            BitArray pop = new BitArray(new bool[] { false, false, false, false, false, false, false, false });
-            BitArray swap = new BitArray(new bool[] { false, false, false, true, false, false, false, false });
-            BitArray push = new BitArray(new bool[] { false, false, true, false, false, false, false, false });
-            BitArray jumpTOS = new BitArray(new bool[] { false, false, true, true, false, false, false, false });
-            BitArray jump = new BitArray(new bool[] { false, true, false, false, false, false, false, false });
-            BitArray jumpIf = new BitArray(new bool[] { false, true, false, true, true, false, false, false });
-            BitArray resetFlg = new BitArray(new bool[] { false, true, true, false, false, false, false, false });
-
-            BitArray add = new BitArray(new bool[] { true, false, false, false, false, false, false, false });
-            BitArray rShift = new BitArray(new bool[] { true, false, false, true, false, false, false, false });
-            BitArray lShift = new BitArray(new bool[] { true, false, true, false, false, false, false, false });
-            BitArray not = new BitArray(new bool[] { true, false, true, true, false, false, false, false });
-            BitArray and = new BitArray(new bool[] { true, true, false, false, false, false, false, false });
-            BitArray or = new BitArray(new bool[] { true, true, false, true, false, false, false, false });
-            BitArray xor = new BitArray(new bool[] { true, true, true, false, false, false, false, false });
-            BitArray compare = new BitArray(new bool[] { true, true, true, true, false, false, false, false });
-
-            //reverse the bit arrays
-            push = Globals.reverseBitArray(push);
-            pop = Globals.reverseBitArray(pop);
-            swap = Globals.reverseBitArray(swap);
-            jumpTOS = Globals.reverseBitArray(jumpTOS);
-            jump = Globals.reverseBitArray(jump);
-            jumpIf = Globals.reverseBitArray(jumpIf);
-            resetFlg = Globals.reverseBitArray(resetFlg);
-
-            inputA = Globals.reverseBitArray(inputA);
-            inputB = Globals.reverseBitArray(inputB);
-            inputC = Globals.reverseBitArray(inputC);
-            inputD = Globals.reverseBitArray(inputD);
-            address = Globals.reverseBitArray(address);
-
-            add = Globals.reverseBitArray(add);
-            rShift = Globals.reverseBitArray(rShift);
-            lShift = Globals.reverseBitArray(lShift);
-            not = Globals.reverseBitArray(not);
-            and = Globals.reverseBitArray(and);
-            or = Globals.reverseBitArray(or);
-            xor = Globals.reverseBitArray(xor);
-            compare = Globals.reverseBitArray(compare);
-
-            //index of last instruction
-            byte[] lastAddress = { 4 };
-
-            //set instructions to load
-            BitArray[] instructions = new BitArray[] { push, inputA, push, inputA, compare };
-
             //create CPU and link methods to respond to events
-            CU = new ControlUnit(instructions, accessRAMLocation, lastAddress, 
+            CU = new ControlUnit(instructions, accessRAMLocation, new byte[] { (byte)lastInstruction }, 
                 pushPopStack, accessStack, readTMPToBus,
                 updateIARContents, updateIRContents, updateMARContents,
                 updateTMPContents, readBUS1, accessALU, updateAccumulatorContents,
@@ -2121,7 +2101,7 @@ namespace CPU_Simulator
             }
         }
         
-        public void resetCPU()
+        public void resetComponents()
         {
             lblIRContents.Text = "00000000";
             lblIRContents.ForeColor = Color.Red;
@@ -2200,17 +2180,31 @@ namespace CPU_Simulator
         public const int WORD_START = WORD_SIZE - 1;        //word stored as big endian
         public const int OPCODE_START = OPCODE_SIZE - 1;    //opcode also big endian
         public const int ALU_OPCODE = OPCODE_START;
-
+                    
         public const string 
-                            //stack and register equivalent instructions
-                            OP_LOAD_POP = "0000", OP_STORE_SWAP = "0001", OP_DATA_PUSH = "0010", OP_JUMP_RG_TOS = "0011",
+            //stack and register opcodes
+            OP_LOAD_POP = "0000", OP_STORE_SWAP = "0001", OP_DATA_PUSH = "0010", OP_JUMP_RG_TOS = "0011",
+            OP_JUMP = "0100", OP_JUMP_IF = "0101", OP_RESET_FLAGS = "0110", OP_IO = "0111",
                             
-                            //instructions the same for both
-                            OP_JUMP = "0100", OP_JUMP_IF = "0101", OP_RESET_FLAGS = "0110", OP_IO = "0111",
-                            
-                            //ALU instructions
-                            ALU_ADD = "1000", ALU_R_SHIFT = "1001", ALU_L_SHIFT = "1010", ALU_NOT = "1011", 
-                            ALU_AND = "1100", ALU_OR = "1101", ALU_XOR = "1110", ALU_COMPARE = "1111";
+            //ALU opcodes
+            ALU_ADD = "1000", ALU_R_SHIFT = "1001", ALU_L_SHIFT = "1010", ALU_NOT = "1011", 
+            ALU_AND = "1100", ALU_OR = "1101", ALU_XOR = "1110", ALU_COMPARE = "1111";
+
+        //map keywords to opcodes
+        public static Dictionary<string, string> keywords = new Dictionary<string, string>
+        {
+            //stack and register keywords
+            { "LD", OP_LOAD_POP }, { "STR", OP_STORE_SWAP }, { "DAT", OP_DATA_PUSH }, { "JRG", OP_JUMP_RG_TOS },
+            { "POP", OP_LOAD_POP }, { "SWP", OP_STORE_SWAP }, { "PSH", OP_DATA_PUSH }, { "JTS", OP_JUMP_RG_TOS },
+            { "JMP", OP_JUMP }, { "JIF", OP_JUMP_IF }, { "RES", OP_RESET_FLAGS }, { "IO", OP_IO },
+
+            //ALU keywords
+            { "ADD", ALU_ADD }, { "RSH", ALU_R_SHIFT }, { "LSH", ALU_L_SHIFT }, { "NOT", ALU_NOT }, { "AND", ALU_AND },
+            { "OR", ALU_OR }, { "XOR", ALU_XOR }, { "CMP", ALU_COMPARE }
+        };
+
+        //additional keywords
+        public const string ADDRESS = "ADR", DATA = "VAL", HALT = "HLT";
 
         //indexes of flags are reversed to support BitArray big endian format 
         public const int COUT_FLAG = 3, A_LARGER_FLAG = 2, EQUAL_FLAG = 1, ZERO_FLAG = 0; 
@@ -2756,7 +2750,7 @@ namespace CPU_Simulator
             MessageBox.Show("End of program");
         }
 
-        public void triggerRestart() { programFinished = true; }
+        public void resetState() { programFinished = true; }
 
         public void fetchInstruction()
         {
