@@ -8,160 +8,169 @@ using System.Threading;
 
 namespace CPU_Simulator
 {
-    public delegate void ReadOnlyRegister();                                            //enable BUS1 output, enable TOS onto bus
-    public delegate void ReadWriteRegister(BitArray data, bool accessMode);             //modify contents of IR, IAR, MAR, TMP etc.
-    public delegate void ReadWriteMemory(BitArray data, int index, bool accessMode);    //modify contents of register which require an address (i.e. RAM)
-    public delegate void ReadWriteFlags(bool accessMode, int index = -1);               //modify contents of flags
+    //the following delegates are used to update state of the CPU on the GUI
+    ///enable BUS1, enable TOS onto bus
+    public delegate void ReadOnlyRegister();                                            
+    
+    ///read/write contents of IR, IAR, MAR, TMP, ACC
+    public delegate void ReadWriteRegister(BitArray data, bool accessMode);             
+    
+    ///read/write contents of GPR and RAM (require an index to access a specific register)
+    public delegate void ReadWriteMemory(BitArray data, int index, bool accessMode);    
+    
+    ///read/write contents of flags (does not need data, is either set to 1 or reset)
+    ///-1 indicates reset, 0-3 indicates register to access
+    public delegate void ReadWriteFlags(bool accessMode, int index = -1);               
 
-    public delegate void ReadWriteStack(bool accessMode, int stackIndex);               //push and pop to stack
+    ///read/write to TOS and shift stack layer positions
+    public delegate void ReadWriteStack(bool accessMode, int stackIndex);               
 
-    public delegate void ALUOperation(BitArray opcode);                                 //indicate ALU in use                     
-    public delegate void RedrawGUI();                                                   //redraw before next step
+    ///activates opcode wires to ALU                     
+    public delegate void ALUOperation(BitArray opcode);                                 
+    
+    ///turns off the bus and control wires
+    public delegate void RedrawGUI();                                                   
 
     public partial class MainForm : Form
     {
         private ControlUnit CU;
         private Thread CPU;
 
-        //indicates which machine in use (register = true) (stack = false)
-        private bool registerMachine;
+        ///which machine in use 
+        ///register = true, stack = false
+        private bool registerMachine;   
 
         private BitArray[] instructions;
         private int lastInstruction;
         private bool halt;
 
-        //indicates if a quick redraw can be done
+        ///can quick redraw can be done
         private bool welcomeScreenDrawn = false;
         private bool UIDrawn = false;
         private bool registerScreenDrawn = false;
         private bool stackScreenDrawn = false;
 
-        //welcome screen
-        private Label lblWelcome = new Label();
-        private Label lblMsg = new Label();
-        private Button btnRegister = new Button();
-        private Button btnStack = new Button();
+        ///welcome screen controls
+        private Label lblWelcomeTitle = new Label();
+        private Label lblWelcomeMsg = new Label();
+        private Button btnLoadRegisterMachine = new Button();
+        private Button btnLoadStackMachine = new Button();
 
-        //controls
-        GroupBox grpControls = new GroupBox();
-        Button btnStart = new Button();
-        Button btnPauseStop = new Button();
-        Button btnReturn = new Button();
-        Label lblClock = new Label();
+        ///CPU controls
+        GroupBox grpControlsBox = new GroupBox();
+        Button btnStartCPU = new Button();
+        Button btnPauseStopCPU = new Button();
+        Button btnReturnHome = new Button();
+        Label lblClockTitle = new Label();
         Label lblClockSpeed = new Label();
-        Button btnIncrease = new Button();
-        Button btnDecrease = new Button();
+        Button btnIncreaseClock = new Button();
+        Button btnDecreaseClock = new Button();
 
-        //code editor
+        ///code editor
         RichTextBox txtCodeEditor = new RichTextBox();
         Button btnLoadCode = new Button();
         Button btnSaveCode = new Button();
         Button btnShowInstructions = new Button();
 
-        //CPU components
-        private Panel pnlControlUnit = new Panel();
-        private Label lblControlUnit = new Label();
+        ///CPU components
+        private Panel pnlCU = new Panel();
+        private Label lblCUName = new Label();
 
         private Panel pnlIAR = new Panel();
-        private Label lblIAR = new Label();
+        private Label lblIARName = new Label();
         private Label lblIARContents = new Label();
 
         private Panel pnlIR = new Panel();
-        private Label lblIR = new Label();
+        private Label lblIRName = new Label();
         private Label lblIRContents = new Label();
 
         private Panel[] pnlGPR = new Panel[Globals.NO_OF_GPR];
-        private Label[] lblGPR = new Label[Globals.NO_OF_GPR];
+        private Label[] lblGPRIndex = new Label[Globals.NO_OF_GPR];
         private Label[] lblGPRContents = new Label[Globals.NO_OF_GPR];
 
         private Panel pnlStack = new Panel();
-        private Label[] lblStack = new Label[Globals.STACK_SIZE];
+        private Label[] lblStackIndex = new Label[Globals.STACK_SIZE];
         private Label[] lblStackContents = new Label[Globals.STACK_SIZE];
 
         private Panel pnlMAR = new Panel();
-        private Label lblMAR = new Label();
+        private Label lblMARName = new Label();
         private Label lblMARContents = new Label();
 
         private Panel pnlRAM = new Panel();
-        private Label lblRAM = new Label();
+        private Label lblRAMName = new Label();
         private Label lblRAMContents = new Label();
         private Label lblRAMAddress = new Label();
 
         private Panel pnlALU = new Panel();
-        private Label lblALU = new Label();
+        private Label lblALUName = new Label();
 
-        //flags               
+        ///flags               
         private Panel pnlFlags = new Panel();
-        private Label lblFlags = new Label();
+        private Label lblFlagsName = new Label();
 
-        private Label lblCout = new Label();
+        private Label lblCoutName = new Label();
         private Label lblCoutContents = new Label();
 
-        private Label lblALarger = new Label();
+        private Label lblALargerName = new Label();
         private Label lblALargerContents = new Label();
 
-        private Label lblEqual = new Label();
+        private Label lblEqualName = new Label();
         private Label lblEqualContents = new Label();
 
-        private Label lblZero = new Label();
+        private Label lblZeroName = new Label();
         private Label lblZeroContents = new Label();
 
         private Panel pnlTMP = new Panel();
-        private Label lblTMP = new Label();
+        private Label lblTMPName = new Label();
         private Label lblTMPContents = new Label();
 
         private Panel pnlBUS1 = new Panel();
-        private Label lblBUS1 = new Label();
+        private Label lblBUS1Name = new Label();
 
         private Panel pnlAcc = new Panel();
-        private Label lblAcc = new Label();
+        private Label lblAccName = new Label();
         private Label lblAccContents = new Label();
 
-        //draw methods
         private void showWelcomeScreen()
         {
             ClientSize = new Size(230, 140);
-
             Text = "Welcome!";
 
-            //object properties already calculated, just add back to the form (faster draw speed)
+            ///object properties already calculated, add back to the form 
+            ///faster draw speed
             if (welcomeScreenDrawn)
             {
-                Controls.Add(lblWelcome);
-                Controls.Add(lblMsg);
-                Controls.Add(btnRegister);
-                Controls.Add(btnStack);
+                Controls.Add(lblWelcomeTitle);
+                Controls.Add(lblWelcomeMsg);
+                Controls.Add(btnLoadRegisterMachine);
+                Controls.Add(btnLoadStackMachine);
             }
 
             else
             {
-                lblWelcome.Text = "CPU Simulator";
-                lblWelcome.Font = new Font("Microsoft Sans Serif", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblWelcome.Location = new Point(30, 20);
-                lblWelcome.Size = new Size(180, 25);
+                lblWelcomeTitle.Text = "CPU Simulator";
+                lblWelcomeTitle.Font = new Font("Microsoft Sans Serif", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                lblWelcomeTitle.Location = new Point(30, 20);
+                lblWelcomeTitle.Size = new Size(180, 25);
+                Controls.Add(lblWelcomeTitle);
 
-                Controls.Add(lblWelcome);
+                lblWelcomeMsg.Text = "Choose the CPU to use:";
+                lblWelcomeMsg.Font = new Font("Microsoft Sans Serif", 12F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                lblWelcomeMsg.Location = new Point(25, 55);
+                lblWelcomeMsg.Size = new Size(180, 20);
+                Controls.Add(lblWelcomeMsg);
 
-                lblMsg.Text = "Choose the CPU to use:";
-                lblMsg.Font = new Font("Microsoft Sans Serif", 12F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblMsg.Location = new Point(25, 55);
-                lblMsg.Size = new Size(180, 20);
+                btnLoadRegisterMachine.Text = "Register";
+                btnLoadRegisterMachine.Location = new Point(35, 85);
+                btnLoadRegisterMachine.Size = new Size(75, 25);
+                btnLoadRegisterMachine.Click += new EventHandler(btnRegister_Click);
+                Controls.Add(btnLoadRegisterMachine);
 
-                Controls.Add(lblMsg);
-
-                btnRegister.Text = "Register";
-                btnRegister.Location = new Point(35, 85);
-                btnRegister.Size = new Size(75, 25);
-                btnRegister.Click += new EventHandler(btnRegister_Click);
-
-                Controls.Add(btnRegister);
-
-                btnStack.Text = "Stack";
-                btnStack.Location = new Point(125, 85);
-                btnStack.Size = new Size(75, 25);
-                btnStack.Click += new EventHandler(btnStack_Click);
-
-                Controls.Add(btnStack);
+                btnLoadStackMachine.Text = "Stack";
+                btnLoadStackMachine.Location = new Point(125, 85);
+                btnLoadStackMachine.Size = new Size(75, 25);
+                btnLoadStackMachine.Click += new EventHandler(btnStack_Click);
+                Controls.Add(btnLoadStackMachine);
 
                 welcomeScreenDrawn = true;
             }
@@ -169,18 +178,17 @@ namespace CPU_Simulator
 
         private void hideWelcomeScreen()
         {
-            Controls.Remove(lblWelcome);
-            Controls.Remove(lblMsg);
-            Controls.Remove(btnRegister);
-            Controls.Remove(btnStack);
+            Controls.Remove(lblWelcomeTitle);
+            Controls.Remove(lblWelcomeMsg);
+            Controls.Remove(btnLoadRegisterMachine);
+            Controls.Remove(btnLoadStackMachine);
         }
 
         private void drawUI()
         {
-            //object properties already calculated, just add back to the form (faster draw speed)
             if (UIDrawn)
             {
-                Controls.Add(grpControls);
+                Controls.Add(grpControlsBox);
                 Controls.Add(txtCodeEditor);
                 Controls.Add(btnLoadCode);
                 Controls.Add(btnSaveCode);
@@ -197,88 +205,68 @@ namespace CPU_Simulator
 
             else
             {
-                //controls box
-                //-------------------------------------------------------------------------------------------------
-                grpControls.Text = "Controls";
-                grpControls.Font = new Font("Microsoft Sans Serif", 12F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                grpControls.Location = new Point(785, 5);
-                grpControls.Size = new Size(345, 145);
+                grpControlsBox.Text = "Controls";
+                grpControlsBox.Font = new Font("Microsoft Sans Serif", 12F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                grpControlsBox.Location = new Point(785, 5);
+                grpControlsBox.Size = new Size(345, 145);
+                Controls.Add(grpControlsBox);
 
-                Controls.Add(grpControls);
+                btnStartCPU.Text = "Start";
+                btnStartCPU.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                btnStartCPU.FlatStyle = FlatStyle.Popup;
+                btnStartCPU.BackColor = Color.LawnGreen;
+                btnStartCPU.Location = new Point(20, 30);
+                btnStartCPU.Size = new Size(75, 25);
+                btnStartCPU.Click += new EventHandler(btnStart_Click);
+                grpControlsBox.Controls.Add(btnStartCPU);
 
-                //start CPU
-                btnStart.Text = "Start";
-                btnStart.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                btnStart.FlatStyle = FlatStyle.Popup;
-                btnStart.BackColor = Color.LawnGreen;
-                btnStart.Location = new Point(20, 30);
-                btnStart.Size = new Size(75, 25);
-                btnStart.Click += new EventHandler(btnStart_Click);
+                btnPauseStopCPU.Text = "Pause";
+                btnPauseStopCPU.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                btnPauseStopCPU.FlatStyle = FlatStyle.Popup;
+                btnPauseStopCPU.BackColor = Color.LightGray;
+                btnPauseStopCPU.Location = new Point(20, 65);
+                btnPauseStopCPU.Size = new Size(75, 25);
+                btnPauseStopCPU.Click += new EventHandler(btnPauseStop_Click);
+                grpControlsBox.Controls.Add(btnPauseStopCPU);
 
-                grpControls.Controls.Add(btnStart);
+                btnReturnHome.Text = "Go Back";
+                btnReturnHome.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                btnReturnHome.FlatStyle = FlatStyle.Popup;
+                btnReturnHome.BackColor = Color.LightGray;
+                btnReturnHome.Location = new Point(20, 100);
+                btnReturnHome.Size = new Size(75, 25);
+                btnReturnHome.Click += new EventHandler(btnReturn_Click);
+                grpControlsBox.Controls.Add(btnReturnHome);
 
-                //pause CPU
-                btnPauseStop.Text = "Pause";
-                btnPauseStop.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                btnPauseStop.FlatStyle = FlatStyle.Popup;
-                btnPauseStop.BackColor = Color.LightGray;
-                btnPauseStop.Location = new Point(20, 65);
-                btnPauseStop.Size = new Size(75, 25);
-                btnPauseStop.Click += new EventHandler(btnPauseStop_Click);
+                lblClockTitle.Text = "Clock Speed:";
+                lblClockTitle.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                lblClockTitle.Location = new Point(115, 55);
+                lblClockTitle.Size = new Size(75, 13);
+                grpControlsBox.Controls.Add(lblClockTitle);
 
-                grpControls.Controls.Add(btnPauseStop);
-
-                //return to home
-                btnReturn.Text = "Go Back";
-                btnReturn.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                btnReturn.FlatStyle = FlatStyle.Popup;
-                btnReturn.BackColor = Color.LightGray;
-                btnReturn.Location = new Point(20, 100);
-                btnReturn.Size = new Size(75, 25);
-                btnReturn.Click += new EventHandler(btnReturn_Click);
-
-                grpControls.Controls.Add(btnReturn);
-
-                //clock speed
-                lblClock.Text = "Clock Speed:";
-                lblClock.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblClock.Location = new Point(115, 55);
-                lblClock.Size = new Size(75, 13);
-
-                grpControls.Controls.Add(lblClock);
-
-                btnDecrease.Text = "-";
-                btnDecrease.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                btnDecrease.Location = new Point(190, 50);
-                btnDecrease.Size = new Size(30, 25);
-                btnDecrease.Click += new EventHandler(btnDecrease_Click);
-
-                grpControls.Controls.Add(btnDecrease);
+                btnDecreaseClock.Text = "-";
+                btnDecreaseClock.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                btnDecreaseClock.Location = new Point(190, 50);
+                btnDecreaseClock.Size = new Size(30, 25);
+                btnDecreaseClock.Click += new EventHandler(btnDecrease_Click);
+                grpControlsBox.Controls.Add(btnDecreaseClock);
 
                 lblClockSpeed.Text = "Real-time";
                 lblClockSpeed.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
                 lblClockSpeed.Location = new Point(225, 55);
                 lblClockSpeed.Size = new Size(51, 15);
+                grpControlsBox.Controls.Add(lblClockSpeed);
 
-                grpControls.Controls.Add(lblClockSpeed);
+                btnIncreaseClock.Text = "+";
+                btnIncreaseClock.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                btnIncreaseClock.Location = new Point(280, 50);
+                btnIncreaseClock.Size = new Size(30, 25);
+                btnIncreaseClock.Click += new EventHandler(btnIncrease_Click);
+                grpControlsBox.Controls.Add(btnIncreaseClock);
 
-                btnIncrease.Text = "+";
-                btnIncrease.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                btnIncrease.Location = new Point(280, 50);
-                btnIncrease.Size = new Size(30, 25);
-                btnIncrease.Click += new EventHandler(btnIncrease_Click);
-
-                grpControls.Controls.Add(btnIncrease);
-                //-------------------------------------------------------------------------------------------------
-
-                //programming area
-                //-------------------------------------------------------------------------------------------------
                 txtCodeEditor.Text = "Write your code here.";
                 txtCodeEditor.Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
                 txtCodeEditor.ForeColor = Color.Gray;
-
-                //draw border
-                //-------------------------------------
                 txtCodeEditor.BorderStyle = BorderStyle.None;
 
                 Graphics drawTextBoxBorder = CreateGraphics();
@@ -288,13 +276,11 @@ namespace CPU_Simulator
 
                 border.Dispose();
                 drawTextBoxBorder.Dispose();
-                //-------------------------------------
 
                 txtCodeEditor.Location = new Point(786, 161);
                 txtCodeEditor.Size = new Size(344, 274);
                 txtCodeEditor.GotFocus += new EventHandler(txtCodeEditor_GotFocus);
                 txtCodeEditor.LostFocus += new EventHandler(txtCodeEditor_LostFocus);
-
                 Controls.Add(txtCodeEditor);
 
                 btnShowInstructions.Text = "Supported Instructions";
@@ -303,7 +289,6 @@ namespace CPU_Simulator
                 btnShowInstructions.Location = new Point(830, 445);
                 btnShowInstructions.Size = new Size(130, 25);
                 btnShowInstructions.Click += new EventHandler(btnShowInstructions_Click);
-
                 Controls.Add(btnShowInstructions);
 
                 btnLoadCode.Text = "Load";
@@ -312,7 +297,6 @@ namespace CPU_Simulator
                 btnLoadCode.Location = new Point(970, 445);
                 btnLoadCode.Size = new Size(75, 25);
                 btnLoadCode.Click += new EventHandler(btnLoadCode_Click);
-
                 Controls.Add(btnLoadCode);
 
                 btnSaveCode.Text = "Save";
@@ -321,9 +305,7 @@ namespace CPU_Simulator
                 btnSaveCode.Location = new Point(1055, 445);
                 btnSaveCode.Size = new Size(75, 25);
                 btnSaveCode.Click += new EventHandler(btnSaveCode_Click);
-
                 Controls.Add(btnSaveCode);
-                //-------------------------------------------------------------------------------------------------
 
                 UIDrawn = true;
             }
@@ -331,7 +313,7 @@ namespace CPU_Simulator
 
         private void hideUI()
         {
-            Controls.Remove(grpControls);
+            Controls.Remove(grpControlsBox);
             Controls.Remove(txtCodeEditor);
             Controls.Remove(btnLoadCode);
             Controls.Remove(btnSaveCode);
@@ -344,37 +326,34 @@ namespace CPU_Simulator
             drawRegisterCircuit();
             drawComponents(registerScreenDrawn);
 
-            lblTMP.Text = "TMP";
+            lblTMPName.Text = "TMP";
 
-            //GPRs already created, just add back to the form (faster draw speed)
             if (registerScreenDrawn)
             {
                 for (int count = 0; count < Globals.NO_OF_GPR; count++)
                     Controls.Add(pnlGPR[count]);
             }
 
-            //create and add GPRs to the form
             else
             {
                 registerScreenDrawn = true;
 
+                ///create GPR objects and group them vertically
                 for (int count = 0, yPos = 160; count < Globals.NO_OF_GPR; count++, yPos += 60)
                 {
                     pnlGPR[count] = new Panel();
                     pnlGPR[count].BorderStyle = BorderStyle.FixedSingle;
                     pnlGPR[count].Location = new Point(655, yPos);
                     pnlGPR[count].Size = new Size(80, 50);
-
                     Controls.Add(pnlGPR[count]);
 
-                    lblGPR[count] = new Label();
-                    lblGPR[count].Text = "RG" + (count + 1).ToString();
-                    lblGPR[count].Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                    lblGPR[count].TextAlign = ContentAlignment.MiddleCenter;
-                    lblGPR[count].Location = new Point(20, 4);
-                    lblGPR[count].Size = new Size(41, 20);
-
-                    pnlGPR[count].Controls.Add(lblGPR[count]);
+                    lblGPRIndex[count] = new Label();
+                    lblGPRIndex[count].Text = "RG" + (count + 1).ToString();
+                    lblGPRIndex[count].Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                    lblGPRIndex[count].TextAlign = ContentAlignment.MiddleCenter;
+                    lblGPRIndex[count].Location = new Point(20, 4);
+                    lblGPRIndex[count].Size = new Size(41, 20);
+                    pnlGPR[count].Controls.Add(lblGPRIndex[count]);
 
                     lblGPRContents[count] = new Label();
                     lblGPRContents[count].Text = "00000000";
@@ -382,7 +361,6 @@ namespace CPU_Simulator
                     lblGPRContents[count].BorderStyle = BorderStyle.FixedSingle;
                     lblGPRContents[count].Location = new Point(10, 26);
                     lblGPRContents[count].Size = new Size(60, 20);
-
                     pnlGPR[count].Controls.Add(lblGPRContents[count]);
                 }
             }
@@ -395,15 +373,14 @@ namespace CPU_Simulator
             drawStackCircuit();
             drawComponents(stackScreenDrawn);
 
-            lblTMP.Text = "TOS";
+            ///TMP becomes TOS for stack
+            lblTMPName.Text = "TOS";
 
-            //stack already created, just add back to the form (faster draw speed)
             if (stackScreenDrawn)
             {
                 Controls.Add(pnlStack);
             }
 
-            //create and add stack to the form
             else
             {
                 stackScreenDrawn = true;
@@ -411,19 +388,17 @@ namespace CPU_Simulator
                 pnlStack.BorderStyle = BorderStyle.FixedSingle;
                 pnlStack.Location = new Point(645, 170);
                 pnlStack.Size = new Size(95, 210);
-
                 Controls.Add(pnlStack);
 
                 for (int count = 0, yPos = 5; count < Globals.STACK_SIZE; count++, yPos += 25)
                 {
-                    lblStack[count] = new Label();
-                    lblStack[count].Text = count.ToString();
-                    lblStack[count].TextAlign = ContentAlignment.MiddleCenter;
-                    lblStack[count].BorderStyle = BorderStyle.FixedSingle;
-                    lblStack[count].Location = new Point(5, yPos);
-                    lblStack[count].Size = new Size(20, 20);
-
-                    pnlStack.Controls.Add(lblStack[count]);
+                    lblStackIndex[count] = new Label();
+                    lblStackIndex[count].Text = count.ToString();
+                    lblStackIndex[count].TextAlign = ContentAlignment.MiddleCenter;
+                    lblStackIndex[count].BorderStyle = BorderStyle.FixedSingle;
+                    lblStackIndex[count].Location = new Point(5, yPos);
+                    lblStackIndex[count].Size = new Size(20, 20);
+                    pnlStack.Controls.Add(lblStackIndex[count]);
 
                     lblStackContents[count] = new Label();
                     lblStackContents[count].Text = "00000000";
@@ -431,7 +406,6 @@ namespace CPU_Simulator
                     lblStackContents[count].BorderStyle = BorderStyle.FixedSingle;
                     lblStackContents[count].Location = new Point(30, yPos);
                     lblStackContents[count].Size = new Size(60, 20);
-
                     pnlStack.Controls.Add(lblStackContents[count]);
                 }
             }
@@ -439,10 +413,9 @@ namespace CPU_Simulator
 
         private void drawComponents(bool screenDrawn)
         {
-            //object properties already calculated, just add back to the form (faster draw speed)
             if (screenDrawn)
             {
-                Controls.Add(pnlControlUnit);
+                Controls.Add(pnlCU);
                 Controls.Add(pnlIAR);
                 Controls.Add(pnlIR);
                 Controls.Add(pnlTMP);
@@ -456,186 +429,131 @@ namespace CPU_Simulator
 
             else
             {
-                //control Unit
-                //--------------------------------------------
-                pnlControlUnit.BorderStyle = BorderStyle.FixedSingle;
-                pnlControlUnit.Location = new Point(275, 175);
-                pnlControlUnit.Size = new Size(350, 200);
+                pnlCU.BorderStyle = BorderStyle.FixedSingle;
+                pnlCU.Location = new Point(275, 175);
+                pnlCU.Size = new Size(350, 200);
+                Controls.Add(pnlCU);
 
-                //add control unit to form
-                Controls.Add(pnlControlUnit);
+                lblCUName.Text = "Control Unit";
+                lblCUName.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                lblCUName.TextAlign = ContentAlignment.TopCenter;
+                lblCUName.Location = new Point(130, 90);
+                lblCUName.Size = new Size(90, 20);
+                pnlCU.Controls.Add(lblCUName);
 
-                //labelling control unit
-                lblControlUnit.Text = "Control Unit";
-                lblControlUnit.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblControlUnit.TextAlign = ContentAlignment.TopCenter;
-                lblControlUnit.Location = new Point(130, 90);
-                lblControlUnit.Size = new Size(90, 20);
-
-                //add label to control unit
-                pnlControlUnit.Controls.Add(lblControlUnit);
-                //--------------------------------------------
-
-                //IAR
-                //--------------------------------------------
                 pnlIAR.BorderStyle = BorderStyle.FixedSingle;
                 pnlIAR.Location = new Point(350, 395);
                 pnlIAR.Size = new Size(80, 50);
-
                 Controls.Add(pnlIAR);
 
-                //labelling IAR
-                lblIAR.Text = "IAR";
-                lblIAR.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblIAR.TextAlign = ContentAlignment.MiddleCenter;
-                lblIAR.Location = new Point(22, 4);
-                lblIAR.Size = new Size(40, 20);
+                lblIARName.Text = "IAR";
+                lblIARName.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                lblIARName.TextAlign = ContentAlignment.MiddleCenter;
+                lblIARName.Location = new Point(22, 4);
+                lblIARName.Size = new Size(40, 20);
+                pnlIAR.Controls.Add(lblIARName);
 
-                pnlIAR.Controls.Add(lblIAR);
-
-                //contents of IAR
                 lblIARContents.Text = "00000000";
                 lblIARContents.TextAlign = ContentAlignment.MiddleCenter;
                 lblIARContents.BorderStyle = BorderStyle.FixedSingle;
                 lblIARContents.Location = new Point(10, 26);
                 lblIARContents.Size = new Size(60, 20);
-
                 pnlIAR.Controls.Add(lblIARContents);
-                //--------------------------------------------
-
-                //IR
-                //--------------------------------------------
+               
                 pnlIR.BorderStyle = BorderStyle.FixedSingle;
                 pnlIR.Location = new Point(470, 395);
                 pnlIR.Size = new Size(80, 50);
-
                 Controls.Add(pnlIR);
 
-                //labelling IR
-                lblIR.Text = "IR";
-                lblIR.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblIR.TextAlign = ContentAlignment.MiddleCenter;
-                lblIR.Location = new Point(22, 4);
-                lblIR.Size = new Size(40, 20);
+                lblIRName.Text = "IR";
+                lblIRName.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                lblIRName.TextAlign = ContentAlignment.MiddleCenter;
+                lblIRName.Location = new Point(22, 4);
+                lblIRName.Size = new Size(40, 20);
+                pnlIR.Controls.Add(lblIRName);
 
-                pnlIR.Controls.Add(lblIR);
-
-                //contents of IR
                 lblIRContents.Text = "00000000";
                 lblIRContents.TextAlign = ContentAlignment.MiddleCenter;
                 lblIRContents.BorderStyle = BorderStyle.FixedSingle;
                 lblIRContents.Location = new Point(10, 26);
                 lblIRContents.Size = new Size(60, 20);
-
                 pnlIR.Controls.Add(lblIRContents);
-                //--------------------------------------------
-
-                //MAR
-                //--------------------------------------------
+ 
                 pnlMAR.BorderStyle = BorderStyle.FixedSingle;
                 pnlMAR.Location = new Point(415, 10);
                 pnlMAR.Size = new Size(80, 50);
-
                 Controls.Add(pnlMAR);
 
-                //labelling MAR
-                lblMAR.Text = "MAR";
-                lblMAR.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblMAR.TextAlign = ContentAlignment.MiddleCenter;
-                lblMAR.Location = new Point(20, 4);
-                lblMAR.Size = new Size(41, 20);
+                lblMARName.Text = "MAR";
+                lblMARName.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                lblMARName.TextAlign = ContentAlignment.MiddleCenter;
+                lblMARName.Location = new Point(20, 4);
+                lblMARName.Size = new Size(41, 20);
+                pnlMAR.Controls.Add(lblMARName);
 
-                pnlMAR.Controls.Add(lblMAR);
-
-                //MAR contents
                 lblMARContents.Text = "00000000";
                 lblMARContents.TextAlign = ContentAlignment.MiddleCenter;
                 lblMARContents.BorderStyle = BorderStyle.FixedSingle;
                 lblMARContents.Location = new Point(10, 26);
                 lblMARContents.Size = new Size(60, 20);
-
                 pnlMAR.Controls.Add(lblMARContents);
-                //--------------------------------------------
 
-                //RAM
-                //--------------------------------------------
                 pnlRAM.BorderStyle = BorderStyle.FixedSingle;
                 pnlRAM.Location = new Point(495, 10);
                 pnlRAM.Size = new Size(270, 50);
-
                 Controls.Add(pnlRAM);
 
-                //labelling RAM
-                lblRAM.Text = "RAM";
-                lblRAM.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblRAM.TextAlign = ContentAlignment.TopCenter;
-                lblRAM.Location = new Point(38, 16);
-                lblRAM.Size = new Size(41, 18);
+                lblRAMName.Text = "RAM";
+                lblRAMName.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                lblRAMName.TextAlign = ContentAlignment.TopCenter;
+                lblRAMName.Location = new Point(38, 16);
+                lblRAMName.Size = new Size(41, 18);
+                pnlRAM.Controls.Add(lblRAMName);
 
-                pnlRAM.Controls.Add(lblRAM);
-
-                //RAM contents
                 lblRAMContents.Text = "00000000";
                 lblRAMContents.TextAlign = ContentAlignment.MiddleCenter;
                 lblRAMContents.BorderStyle = BorderStyle.FixedSingle;
                 lblRAMContents.Location = new Point(164, 15);
                 lblRAMContents.Size = new Size(60, 20);
-
                 pnlRAM.Controls.Add(lblRAMContents);
 
-                //RAM address
-                lblRAMAddress.Text = "Addr 0:";
+                lblRAMAddress.Text = "Addr 0";
                 lblRAMAddress.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblRAMAddress.TextAlign = ContentAlignment.TopCenter;
-                lblRAMAddress.Location = new Point(107, 16);
-                lblRAMAddress.Size = new Size(54, 18);
-
+                lblRAMAddress.TextAlign = ContentAlignment.TopRight;
+                lblRAMAddress.Location = new Point(90, 16);
+                lblRAMAddress.Size = new Size(70, 18);
                 pnlRAM.Controls.Add(lblRAMAddress);
-                //--------------------------------------------
 
-                //ALU
-                //--------------------------------------------
                 pnlALU.BorderStyle = BorderStyle.FixedSingle;
                 pnlALU.Location = new Point(40, 175);
                 pnlALU.Size = new Size(100, 200);
-
                 Controls.Add(pnlALU);
 
-                //labelling ALU
-                lblALU.Text = "ALU";
-                lblALU.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblALU.TextAlign = ContentAlignment.MiddleCenter;
-                lblALU.Location = new Point(30, 90);
-                lblALU.Size = new Size(40, 20);
+                lblALUName.Text = "ALU";
+                lblALUName.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                lblALUName.TextAlign = ContentAlignment.MiddleCenter;
+                lblALUName.Location = new Point(30, 90);
+                lblALUName.Size = new Size(40, 20);
+                pnlALU.Controls.Add(lblALUName);
 
-                pnlALU.Controls.Add(lblALU);
-                //--------------------------------------------
-
-                //flag registers
-                //--------------------------------------------
                 pnlFlags.BorderStyle = BorderStyle.FixedSingle;
                 pnlFlags.Location = new Point(170, 240);
                 pnlFlags.Size = new Size(75, 135);
-
                 Controls.Add(pnlFlags);
 
-                //labelling flag register
-                lblFlags.Text = "FLAGS";
-                lblFlags.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblFlags.TextAlign = ContentAlignment.TopCenter;
-                lblFlags.Location = new Point(10, 5);
-                lblFlags.Size = new Size(60, 20);
+                lblFlagsName.Text = "FLAGS";
+                lblFlagsName.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                lblFlagsName.TextAlign = ContentAlignment.TopCenter;
+                lblFlagsName.Location = new Point(10, 5);
+                lblFlagsName.Size = new Size(60, 20);
+                pnlFlags.Controls.Add(lblFlagsName);
 
-                pnlFlags.Controls.Add(lblFlags);
-
-                //flag labels & contents
-                lblCout.Text = "COUT";
-                lblCout.TextAlign = ContentAlignment.BottomRight;
-                lblCout.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblCout.Location = new Point(5, 30);
-                lblCout.Size = new Size(40, 15);
-
-                pnlFlags.Controls.Add(lblCout);
+                lblCoutName.Text = "COUT";
+                lblCoutName.TextAlign = ContentAlignment.BottomRight;
+                lblCoutName.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                lblCoutName.Location = new Point(5, 30);
+                lblCoutName.Size = new Size(40, 15);
+                pnlFlags.Controls.Add(lblCoutName);
 
                 lblCoutContents.Text = "0";
                 lblCoutContents.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
@@ -643,16 +561,14 @@ namespace CPU_Simulator
                 lblCoutContents.BorderStyle = BorderStyle.FixedSingle;
                 lblCoutContents.Location = new Point(50, 30);
                 lblCoutContents.Size = new Size(15, 15);
-
                 pnlFlags.Controls.Add(lblCoutContents);
 
-                lblALarger.Text = "A > B";
-                lblALarger.TextAlign = ContentAlignment.BottomRight;
-                lblALarger.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblALarger.Location = new Point(5, 50);
-                lblALarger.Size = new Size(40, 15);
-
-                pnlFlags.Controls.Add(lblALarger);
+                lblALargerName.Text = "A > B";
+                lblALargerName.TextAlign = ContentAlignment.BottomRight;
+                lblALargerName.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                lblALargerName.Location = new Point(5, 50);
+                lblALargerName.Size = new Size(40, 15);
+                pnlFlags.Controls.Add(lblALargerName);
 
                 lblALargerContents.Text = "0";
                 lblALargerContents.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
@@ -660,16 +576,14 @@ namespace CPU_Simulator
                 lblALargerContents.BorderStyle = BorderStyle.FixedSingle;
                 lblALargerContents.Location = new Point(50, 50);
                 lblALargerContents.Size = new Size(15, 15);
-
                 pnlFlags.Controls.Add(lblALargerContents);
 
-                lblEqual.Text = "A = B";
-                lblEqual.TextAlign = ContentAlignment.BottomRight;
-                lblEqual.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblEqual.Location = new Point(5, 70);
-                lblEqual.Size = new Size(40, 15);
-
-                pnlFlags.Controls.Add(lblEqual);
+                lblEqualName.Text = "A = B";
+                lblEqualName.TextAlign = ContentAlignment.BottomRight;
+                lblEqualName.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                lblEqualName.Location = new Point(5, 70);
+                lblEqualName.Size = new Size(40, 15);
+                pnlFlags.Controls.Add(lblEqualName);
 
                 lblEqualContents.Text = "0";
                 lblEqualContents.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
@@ -677,16 +591,14 @@ namespace CPU_Simulator
                 lblEqualContents.BorderStyle = BorderStyle.FixedSingle;
                 lblEqualContents.Location = new Point(50, 70);
                 lblEqualContents.Size = new Size(15, 15);
-
                 pnlFlags.Controls.Add(lblEqualContents);
 
-                lblZero.Text = "ZERO";
-                lblZero.TextAlign = ContentAlignment.BottomRight;
-                lblZero.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblZero.Location = new Point(5, 90);
-                lblZero.Size = new Size(40, 15);
-
-                pnlFlags.Controls.Add(lblZero);
+                lblZeroName.Text = "ZERO";
+                lblZeroName.TextAlign = ContentAlignment.BottomRight;
+                lblZeroName.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                lblZeroName.Location = new Point(5, 90);
+                lblZeroName.Size = new Size(40, 15);
+                pnlFlags.Controls.Add(lblZeroName);
 
                 lblZeroContents.Text = "0";
                 lblZeroContents.Font = new Font("Microsoft Sans Serif", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
@@ -694,81 +606,56 @@ namespace CPU_Simulator
                 lblZeroContents.BorderStyle = BorderStyle.FixedSingle;
                 lblZeroContents.Location = new Point(50, 90);
                 lblZeroContents.Size = new Size(15, 15);
-
                 pnlFlags.Controls.Add(lblZeroContents);
-                //--------------------------------------------
-
-                //TMP register
-                //--------------------------------------------
+                
                 pnlTMP.BorderStyle = BorderStyle.FixedSingle;
                 pnlTMP.Location = new Point(80, 60);
                 pnlTMP.Size = new Size(80, 50);
-
                 Controls.Add(pnlTMP);
 
-                //labelling temp
-                lblTMP.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblTMP.TextAlign = ContentAlignment.MiddleCenter;
-                lblTMP.Location = new Point(20, 4);
-                lblTMP.Size = new Size(40, 20);
+                lblTMPName.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                lblTMPName.TextAlign = ContentAlignment.MiddleCenter;
+                lblTMPName.Location = new Point(20, 4);
+                lblTMPName.Size = new Size(40, 20);
+                pnlTMP.Controls.Add(lblTMPName);
 
-                pnlTMP.Controls.Add(lblTMP);
-
-                //temp contents
                 lblTMPContents.Text = "00000000";
                 lblTMPContents.TextAlign = ContentAlignment.MiddleCenter;
                 lblTMPContents.BorderStyle = BorderStyle.FixedSingle;
                 lblTMPContents.Location = new Point(10, 26);
                 lblTMPContents.Size = new Size(60, 20);
-
                 pnlTMP.Controls.Add(lblTMPContents);
-                //--------------------------------------------
 
-                //BUS1 register
-                //--------------------------------------------
-                //BUS1 object
                 pnlBUS1.BorderStyle = BorderStyle.FixedSingle;
                 pnlBUS1.Location = new Point(91, 130);
                 pnlBUS1.Size = new Size(60, 25);
-
                 Controls.Add(pnlBUS1);
 
-                //labelling BUS1
-                lblBUS1.Text = "BUS1";
-                lblBUS1.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblBUS1.TextAlign = ContentAlignment.MiddleCenter;
-                lblBUS1.Location = new Point(5, 1);
-                lblBUS1.Size = new Size(50, 20);
+                lblBUS1Name.Text = "BUS1";
+                lblBUS1Name.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                lblBUS1Name.TextAlign = ContentAlignment.MiddleCenter;
+                lblBUS1Name.Location = new Point(5, 1);
+                lblBUS1Name.Size = new Size(50, 20);
+                pnlBUS1.Controls.Add(lblBUS1Name);
 
-                pnlBUS1.Controls.Add(lblBUS1);
-                //--------------------------------------------
-
-                //Accumulator register
-                //--------------------------------------------
                 pnlAcc.BorderStyle = BorderStyle.FixedSingle;
                 pnlAcc.Location = new Point(50, 395);
                 pnlAcc.Size = new Size(80, 50);
-
                 Controls.Add(pnlAcc);
 
-                //labelling accumulator
-                lblAcc.Text = "ACC";
-                lblAcc.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
-                lblAcc.TextAlign = ContentAlignment.MiddleCenter;
-                lblAcc.Location = new Point(22, 4);
-                lblAcc.Size = new Size(40, 20);
+                lblAccName.Text = "ACC";
+                lblAccName.Font = new Font("Microsoft Sans Serif", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                lblAccName.TextAlign = ContentAlignment.MiddleCenter;
+                lblAccName.Location = new Point(22, 4);
+                lblAccName.Size = new Size(40, 20);
+                pnlAcc.Controls.Add(lblAccName);
 
-                pnlAcc.Controls.Add(lblAcc);
-
-                //accumulator contents
                 lblAccContents.Text = "00000000";
                 lblAccContents.TextAlign = ContentAlignment.MiddleCenter;
                 lblAccContents.BorderStyle = BorderStyle.FixedSingle;
                 lblAccContents.Location = new Point(10, 26);
                 lblAccContents.Size = new Size(60, 20);
-
                 pnlAcc.Controls.Add(lblAccContents);
-                //--------------------------------------------
             }
         }
 
@@ -788,7 +675,7 @@ namespace CPU_Simulator
 
         private void hideComponents()
         {
-            Controls.Remove(pnlControlUnit);
+            Controls.Remove(pnlCU);
             Controls.Remove(pnlIAR);
             Controls.Remove(pnlIR);
             Controls.Remove(pnlTMP);
@@ -806,21 +693,21 @@ namespace CPU_Simulator
             Pen controlWire = new Pen(Color.Black);
             controlWire.Width = 2;
 
-            //GPR1
-            circuit.DrawLine(controlWire, 655, 190, 625, 190);  //enable
-            circuit.DrawLine(controlWire, 655, 185, 625, 185);  //set
+            ///GPR1
+            circuit.DrawLine(controlWire, 655, 190, 625, 190);  ///enable
+            circuit.DrawLine(controlWire, 655, 185, 625, 185);  ///set
 
-            //GPR2
-            circuit.DrawLine(controlWire, 655, 250, 625, 250);  //enable
-            circuit.DrawLine(controlWire, 655, 245, 625, 245);  //set
+            ///GPR2
+            circuit.DrawLine(controlWire, 655, 250, 625, 250);  ///enable
+            circuit.DrawLine(controlWire, 655, 245, 625, 245);  ///set
 
-            //GPR3
-            circuit.DrawLine(controlWire, 655, 315, 625, 315);  //enable
-            circuit.DrawLine(controlWire, 655, 310, 625, 310);  //set
+            ///GPR3
+            circuit.DrawLine(controlWire, 655, 315, 625, 315);  ///enable
+            circuit.DrawLine(controlWire, 655, 310, 625, 310);  ///set
 
-            //GPR4
-            circuit.DrawLine(controlWire, 655, 365, 625, 365);  //enable
-            circuit.DrawLine(controlWire, 655, 360, 625, 360);  //set
+            ///GPR4
+            circuit.DrawLine(controlWire, 655, 365, 625, 365);  ///enable
+            circuit.DrawLine(controlWire, 655, 360, 625, 360);  ///set
 
             controlWire.Dispose();
             circuit.Dispose();
@@ -834,8 +721,8 @@ namespace CPU_Simulator
             Pen controlWire = new Pen(Color.Black);
             controlWire.Width = 2;
 
-            circuit.DrawLine(controlWire, 655, 190, 625, 190);  //enable
-            circuit.DrawLine(controlWire, 655, 185, 625, 185);  //set
+            circuit.DrawLine(controlWire, 655, 190, 625, 190);  ///enable
+            circuit.DrawLine(controlWire, 655, 185, 625, 185);  ///set
 
             controlWire.Dispose();
             circuit.Dispose();
@@ -851,77 +738,75 @@ namespace CPU_Simulator
 
             controlWire.Width = 2;
 
-            //CU position  |  x    y
-            //top left     | 275, 175
-            //bottom right | 625, 375
+            ///IAR
+            circuit.DrawLine(controlWire, 365, 395, 365, 375);  ///enable
+            circuit.DrawLine(controlWire, 370, 395, 370, 375);  ///set
 
-            //IAR
-            circuit.DrawLine(controlWire, 365, 395, 365, 375);  //enable
-            circuit.DrawLine(controlWire, 370, 395, 370, 375);  //set
+            ///IR
+            circuit.DrawLine(controlWire, 485, 395, 485, 375);  ///opcode 1
+            circuit.DrawLine(controlWire, 488, 395, 488, 375);  ///opcode 2
+            circuit.DrawLine(controlWire, 491, 395, 491, 375);  ///opcode 3
+            circuit.DrawLine(controlWire, 494, 395, 494, 375);  ///opcode 4
+            circuit.DrawLine(controlWire, 497, 395, 497, 375);  ///opcode 5
+            circuit.DrawLine(controlWire, 500, 395, 500, 375);  ///opcode 6
+            circuit.DrawLine(controlWire, 503, 395, 503, 375);  ///opcode 7
+            circuit.DrawLine(controlWire, 506, 395, 506, 375);  ///opcode 8
 
-            //IR
-            circuit.DrawLine(controlWire, 485, 395, 485, 375);  //opcode 1
-            circuit.DrawLine(controlWire, 488, 395, 488, 375);  //opcode 2
-            circuit.DrawLine(controlWire, 491, 395, 491, 375);  //opcode 3
-            circuit.DrawLine(controlWire, 494, 395, 494, 375);  //opcode 4
-            circuit.DrawLine(controlWire, 497, 395, 497, 375);  //opcode 5
-            circuit.DrawLine(controlWire, 500, 395, 500, 375);  //opcode 6
-            circuit.DrawLine(controlWire, 503, 395, 503, 375);  //opcode 7
-            circuit.DrawLine(controlWire, 506, 395, 506, 375);  //opcode 8
+            circuit.DrawLine(controlWire, 530, 395, 530, 375);  ///set
 
-            circuit.DrawLine(controlWire, 530, 395, 530, 375);  //set
+            ///MAR
+            circuit.DrawLine(controlWire, 430, 60, 430, 175);   ///enable
+            circuit.DrawLine(controlWire, 435, 60, 435, 175);   ///set
 
-            //MAR
-            circuit.DrawLine(controlWire, 430, 60, 430, 175);   //enable
-            circuit.DrawLine(controlWire, 435, 60, 435, 175);   //set
+            ///RAM
+            circuit.DrawLine(controlWire, 515, 60, 515, 175);   ///enable
+            circuit.DrawLine(controlWire, 520, 60, 520, 175);   ///set
 
-            //RAM
-            circuit.DrawLine(controlWire, 515, 60, 515, 175);   //enable
-            circuit.DrawLine(controlWire, 520, 60, 520, 175);   //set
+            ///ALU
+            circuit.DrawLine(controlWire, 140, 190, 275, 190);  ///op 1
+            circuit.DrawLine(controlWire, 140, 194, 275, 194);  ///op 2
+            circuit.DrawLine(controlWire, 140, 198, 275, 198);  ///op 3
 
-            //ALU
-            circuit.DrawLine(controlWire, 140, 190, 275, 190);  //op 1
-            circuit.DrawLine(controlWire, 140, 194, 275, 194);  //op 2
-            circuit.DrawLine(controlWire, 140, 198, 275, 198);  //op 3
-
-            //flags
-            //-------------------------------------
-            circuit.DrawLine(controlWire, 140, 280, 170, 280);  //cout ALU  -> flag
-            circuit.DrawLine(controlWire, 245, 280, 275, 280);  //cout flag -> 
-
-            circuit.DrawLine(controlWire, 140, 300, 170, 300);  //a >  ALU  -> flag
-            circuit.DrawLine(controlWire, 245, 300, 275, 300);  //a >  flag -> 
-
-            circuit.DrawLine(controlWire, 140, 320, 170, 320);  //=    ALU  -> flag
-            circuit.DrawLine(controlWire, 245, 320, 275, 320);  //=    flag -> 
-
-            circuit.DrawLine(controlWire, 140, 340, 170, 340);  //0    ALU  -> flag
-            circuit.DrawLine(controlWire, 245, 340, 275, 340);  //0    flag -> 
+            ///flags
+            circuit.DrawLine(controlWire, 140, 280, 170, 280);  ///cout wire | ALU  -> flag
+            circuit.DrawLine(controlWire, 245, 280, 275, 280);  ///cout wire | flag -> CU
+                                                                              
+            circuit.DrawLine(controlWire, 140, 300, 170, 300);  ///a > wire  | ALU  -> flag
+            circuit.DrawLine(controlWire, 245, 300, 275, 300);  ///a > wire  | flag -> CU
+                                                                               
+            circuit.DrawLine(controlWire, 140, 320, 170, 320);  ///= wire    | ALU  -> flag
+            circuit.DrawLine(controlWire, 245, 320, 275, 320);  ///= wire    | flag -> CU
+                                                                                 
+            circuit.DrawLine(controlWire, 140, 340, 170, 340);  ///0 wire    | ALU  -> flag
+            circuit.DrawLine(controlWire, 245, 340, 275, 340);  ///0 wire    | flag -> CU
 
 
-            circuit.DrawLine(controlWire, 260, 280, 260, 230);  //cout -> cin
-            circuit.FillEllipse(wireJoint, 255, 275, 8, 8);    //connection point
-            circuit.DrawLine(controlWire, 260, 230, 140, 230);  //cout -> cin
+            circuit.DrawLine(controlWire, 260, 280, 260, 230);  ///cout -> cin
+            circuit.FillEllipse(wireJoint, 255, 275, 8, 8);     ///connection point
+            circuit.DrawLine(controlWire, 260, 230, 140, 230);  ///cout -> cin
 
-            circuit.DrawLine(controlWire, 245, 360, 275, 360);  //set
-            //-------------------------------------
+            circuit.DrawLine(controlWire, 245, 360, 275, 360);  ///set
 
-            //TMP
-            circuit.DrawLine(controlWire, 160, 75, 325, 75);    //enable
+            ///TMP
+            ///enable
+            circuit.DrawLine(controlWire, 160, 75, 325, 75);    
             circuit.DrawLine(controlWire, 325, 75, 325, 175);
 
-            circuit.DrawLine(controlWire, 160, 80, 320, 80);    //set
+            ///set
+            circuit.DrawLine(controlWire, 160, 80, 320, 80);    
             circuit.DrawLine(controlWire, 320, 80, 320, 175);
 
-            //to BUS1
-            circuit.DrawLine(controlWire, 151, 140, 285, 140);  //enable
+            ///to BUS1
+            circuit.DrawLine(controlWire, 151, 140, 285, 140);  ///enable
             circuit.DrawLine(controlWire, 285, 140, 285, 175);
 
-            //to accumulator
-            circuit.DrawLine(controlWire, 130, 410, 285, 410);   //enable
+            ///to accumulator
+            ///enable
+            circuit.DrawLine(controlWire, 130, 410, 285, 410);   
             circuit.DrawLine(controlWire, 285, 410, 285, 375);
 
-            circuit.DrawLine(controlWire, 130, 415, 290, 415);   //set
+            ///set
+            circuit.DrawLine(controlWire, 130, 415, 290, 415);   
             circuit.DrawLine(controlWire, 290, 415, 290, 375);
 
             circuit.Dispose();
@@ -939,79 +824,78 @@ namespace CPU_Simulator
 
             bus.Width = 1;
 
-            //surrounding CPU
-            //---------------------------------
-            //MAR to top left
+            ///surrounding CPU
+            ///MAR to top left
             circuit.DrawLine(bus, 415, 40, 15, 40);
             circuit.DrawLine(bus, 415, 35, 10, 35);
 
-            //top left to bottom
+            ///top left to bottom
             circuit.DrawLine(bus, 15, 40, 15, 465);
             circuit.DrawLine(bus, 10, 35, 10, 470);
 
-            //bottom left to right
+            ///bottom left to right
             circuit.DrawLine(bus, 10, 470, 760, 470);
             circuit.DrawLine(bus, 15, 465, 755, 465);
 
-            //bottom right to RAM
+            ///bottom right to RAM
             circuit.DrawLine(bus, 760, 470, 760, 60);
             circuit.DrawLine(bus, 755, 465, 755, 60);
-            //---------------------------------
 
-            //TMP
+            ///TMP
             circuit.DrawLine(bus, 117.5f, 35, 117.5f, 75);
             circuit.DrawLine(bus, 122.5f, 35, 122.5f, 75);
 
-            //ALU
+            ///ALU
             circuit.DrawLine(bus, 57.5f, 35, 57.5f, 180);
             circuit.DrawLine(bus, 62.5f, 35, 62.5f, 180);
 
+            ///circuit seperate from the bus, should not highlight
             if (!enable)
             {
-                //TMP -> BUS1
+                ///TMP -> BUS1
                 circuit.DrawLine(bus, 117.5f, 110, 117.5f, 130);
                 circuit.DrawLine(bus, 122.5f, 110, 122.5f, 130);
 
-                //BUS1 -> ALU
+                ///BUS1 -> ALU
                 circuit.DrawLine(bus, 117.5f, 155, 117.5f, 180);
                 circuit.DrawLine(bus, 122.5f, 155, 122.5f, 180);
 
-                //ALU -> accumulator
+                ///ALU -> accumulator
                 circuit.DrawLine(bus, 87.5f, 375, 87.5f, 395);
                 circuit.DrawLine(bus, 92.5f, 375, 92.5f, 395);
             }
 
-            //accumulator
+            ///accumulator
             circuit.DrawLine(bus, 87.5f, 445, 87.5f, 470);
             circuit.DrawLine(bus, 92.5f, 445, 92.5f, 470);
 
-            //between IAR & IR
+            ///between IAR & IR
             circuit.DrawLine(bus, 447.5f, 470, 447.5f, 422.5f);
             circuit.DrawLine(bus, 452.5f, 470, 452.5f, 422.5f);
 
-            //IAR
+            ///IAR
             circuit.DrawLine(bus, 452.5f, 422.5f, 430, 422.5f);
             circuit.DrawLine(bus, 452.5f, 427.5f, 430, 427.5f);
 
-            //IR
+            ///IR
             circuit.DrawLine(bus, 447.5f, 422.5f, 470, 422.5f);
             circuit.DrawLine(bus, 447.5f, 427.5f, 470, 427.5f);
 
-            //GPR1/Stack
+            ///GPR1/stack
             circuit.DrawLine(bus, 735, 182.5f, 760, 182.5f);
             circuit.DrawLine(bus, 735, 187.5f, 760, 187.5f);
 
             if (registerMachine)
             {
-                //GPR2
+                ///GPR2
                 circuit.DrawLine(bus, 735, 242.5f, 760, 242.5f);
                 circuit.DrawLine(bus, 735, 247.5f, 760, 247.5f);
 
-                //GPR3
+                ///GPR3
                 circuit.DrawLine(bus, 735, 302.5f, 760, 302.5f);
                 circuit.DrawLine(bus, 735, 307.5f, 760, 307.5f);
 
-                //GPR4
+                ///GPR4
                 circuit.DrawLine(bus, 735, 362.5f, 760, 362.5f);
                 circuit.DrawLine(bus, 735, 367.5f, 760, 367.5f);
             }
@@ -1020,13 +904,12 @@ namespace CPU_Simulator
             bus.Dispose();
         }
 
-        //control methods
         private void btnRegister_Click(object sender, EventArgs e)
         {
+            registerMachine = true;
+
             ClientSize = new Size(1137, 489);
             Text = "Register CPU Simulator";
-
-            registerMachine = true;
 
             hideWelcomeScreen();
             drawRegisterCPU();
@@ -1035,10 +918,10 @@ namespace CPU_Simulator
 
         private void btnStack_Click(object sender, EventArgs e)
         {
+            registerMachine = false;
+
             ClientSize = new Size(1137, 489);
             Text = "Stack CPU Simulator";
-
-            registerMachine = false;
 
             hideWelcomeScreen();
             drawStackCPU();
@@ -1047,23 +930,24 @@ namespace CPU_Simulator
 
         private void btnStart_Click(object sender, EventArgs e)
         {
-            //CPU is not active
+            ///not active
             if (CPU == null || CPU.ThreadState == ThreadState.Aborted || CPU.ThreadState == ThreadState.Stopped)
             {
-                //CPU has previously run
+                ///previously run
+                ///reset everything
                 if (CPU != null)
                 {
+                    if (CPU.ThreadState == ThreadState.Aborted)
+                        btnPauseStopCPU.Text = "Pause";
+
                     CU.resetState();
                     resetComponents();
-
-                    if (CPU.ThreadState == ThreadState.Aborted)
-                        btnPauseStop.Text = "Pause";
-
-                    Thread.Sleep(Globals.CLOCK_SPEED);
+                    Thread.Sleep(1000);
 
                     resetColours();
                 }
 
+                ///compile program and start
                 if (compileAndRun())
                 {
                     CPU = new Thread(new ThreadStart(CU.start));
@@ -1071,35 +955,33 @@ namespace CPU_Simulator
                 }
             }
 
-            //CPU is paused
+            ///paused
             else if (CPU.ThreadState == ThreadState.Suspended)
             {
                 CPU.Resume();
-                btnPauseStop.Text = "Pause";
+                btnPauseStopCPU.Text = "Pause";
             }
         }
 
         private void btnPauseStop_Click(object sender, EventArgs e)
         {
-            //no thread active
-            if (CPU == null || 
-                CPU.ThreadState == ThreadState.Stopped)
+            ///not active
+            if (CPU == null || CPU.ThreadState == ThreadState.Stopped)
                 MessageBox.Show("CPU not currently running.");
 
-            //thread paused
+            ///clicking when paused stops CPU entirely
             else if (CPU.ThreadState == ThreadState.Suspended)
             {
                 CPU.Resume();
                 CPU.Abort();
-                btnPauseStop.Text = "Stopped";
+                btnPauseStopCPU.Text = "Stopped";
             }
 
-            //thread active
-            else if (CPU.ThreadState == ThreadState.Running || 
-                CPU.ThreadState == ThreadState.WaitSleepJoin)
+            ///active
+            else if (CPU.ThreadState == ThreadState.Running || CPU.ThreadState == ThreadState.WaitSleepJoin)
             {
                 CPU.Suspend();
-                btnPauseStop.Text = "Stop";
+                btnPauseStopCPU.Text = "Stop";
             }
         }
 
@@ -1122,17 +1004,16 @@ namespace CPU_Simulator
 
         private void btnReturn_Click(object sender, EventArgs e)
         {
-            //thread exists
+            ///thread exists
             if (CPU != null)
             {
-                //thread running
-                if (CPU.ThreadState == ThreadState.Running ||
-                    CPU.ThreadState == ThreadState.WaitSleepJoin)
+                ///running
+                if (CPU.ThreadState == ThreadState.Running || CPU.ThreadState == ThreadState.WaitSleepJoin)
                 {
                     CPU.Abort();
                 }
 
-                //cannot abort suspended thread
+                ///paused
                 else if (CPU.ThreadState == ThreadState.Suspended)
                 {
                     CPU.Resume();
@@ -1140,10 +1021,9 @@ namespace CPU_Simulator
                 }
             }
 
-            hideUI();
-
             if (registerMachine) hideRegisterCPU();
             else hideStackCPU();
+            hideUI();
 
             Invalidate();
             showWelcomeScreen();
@@ -1175,16 +1055,16 @@ namespace CPU_Simulator
 
         private void btnLoadCode_Click(object sender, EventArgs e)
         {
-            //open file explorer and search for text files
+            ///open file explorer and search for text files
             OpenFileDialog fileExplorer = new OpenFileDialog() { Filter = "Text files (*.txt)|*.txt" };
             fileExplorer.ShowDialog();
 
-            //load selected file into string
             if (fileExplorer.FileName != "")
             {
+                ///load selected file into string
                 string program = System.IO.File.ReadAllText(fileExplorer.FileName);
 
-                //load string into text box
+                ///load string into text box
                 txtCodeEditor.Text = program;
                 txtCodeEditor.ForeColor = Color.Black;
             }
@@ -1194,20 +1074,19 @@ namespace CPU_Simulator
         {
             string[] program = new string[txtCodeEditor.Lines.Length];
 
-            //read each line in text box
+            ///read each line of code
             for (int currentLine = 0; currentLine < program.Length; currentLine++)
                 program[currentLine] = txtCodeEditor.Lines[currentLine];
 
-            //open file explorer to save a text file
+            ///open file explorer to save to a file
             SaveFileDialog fileExplorer = new SaveFileDialog() { Filter = "Text files (*.txt)|*.txt" };
             fileExplorer.ShowDialog();
 
-            //write program to file selected
+            ///write program to file selected
             if (fileExplorer.FileName != "")
                 System.IO.File.WriteAllLines(fileExplorer.FileName, program);
         }
 
-        //loading methods
         private bool compileAndRun()
         {
             BitArray instruction = new BitArray(Globals.WORD_SIZE);
@@ -1216,46 +1095,42 @@ namespace CPU_Simulator
 
             halt = false;
 
-            //create empty program
+            ///create empty program
             instructions = new BitArray[Globals.RAM_SIZE];
 
-            //read each line of text box until the end or there is a problem
+            ///read each line of text box until the end or there is a problem
             for (int currentLine = 0; currentLine < txtCodeEditor.Lines.Length && compiled; currentLine++)
             {
-                currentInstruction = txtCodeEditor.Lines[currentLine];  //get current instruction
+                ///get current instruction
+                currentInstruction = txtCodeEditor.Lines[currentLine];  
 
-                //check if written as binary
                 bool isBinary = true;
                 string temp = "";
+                
+                ///check if written as binary
                 for (int currentBit = 0; currentBit < currentInstruction.Length; currentBit++)
                 {
-                    if (currentInstruction[currentBit] != ' ' && currentInstruction[currentBit] != '0' && currentInstruction[currentBit] != '1')
-                        isBinary = false;
-
-                    else if (currentInstruction[currentBit] == '1')
-                        temp += 1;
-
-                    else if (currentInstruction[currentBit] == '0')
-                        temp += 0;
+                    if (currentInstruction[currentBit] == '1') temp += 1;
+                    else if (currentInstruction[currentBit] == '0') temp += 0;
+                    else if (currentInstruction[currentBit] != ' ') isBinary = false;
                 }
 
-                //instruction is binary, convert to bitarray
                 if (isBinary)
                 {
                     currentInstruction = temp;
 
-                    //small enough to fit in memory
+                    ///small enough to fit in memory
                     if (currentInstruction.Length <= Globals.WORD_SIZE)
                     {
-                        //fill remaining bits as 0s
+                        ///smaller than 8 bits, fill gaps with 0s
                         if (currentInstruction.Length < Globals.WORD_SIZE)
                         {
                             string blanks = "";
                             for (int currentBit = currentInstruction.Length; currentBit < Globals.WORD_SIZE; currentBit++)
                                 blanks += '0';
 
-                            blanks += currentInstruction;   //put 0s before value
-                            currentInstruction = blanks;    //copy to instruction
+                            blanks += currentInstruction;   ///put 0s before value
+                            currentInstruction = blanks;    ///copy to instruction
                         }
 
                         instruction = Globals.convertStringToBits(currentInstruction);
@@ -1268,12 +1143,10 @@ namespace CPU_Simulator
                     }
                 }
 
-                else isBinary = false;
-
-                //convert assembly to binary
+                ///not binary, parse instruction
                 if (!isBinary) instruction = convertToBinary(currentInstruction, currentLine);
 
-                //add instruction to program
+                ///add instruction to program
                 if (instruction != null) instructions[currentLine] = instruction;
                 else compiled = false;
             }
@@ -1284,7 +1157,7 @@ namespace CPU_Simulator
                 compiled = false;
             }
 
-            if (compiled)
+            else if (compiled)
             {
                 if (registerMachine) loadRegisterCPU();
                 else loadStackCPU();
@@ -1299,11 +1172,11 @@ namespace CPU_Simulator
             string opcode = "", parameters = "", fullInstruction = "";
             bool parametersBinary = true;
 
-            //get opcode
+            ///get opcode
             for (int opcodeBit = 0; opcodeBit < instruction.Length && instruction[opcodeBit] != ' '; opcodeBit++)
                     opcode += instruction[opcodeBit];
 
-            //get parameters
+            ///get parameters
             for (int addressBit = opcode.Length + 1; addressBit < instruction.Length; addressBit++)
             {
                 if (instruction[addressBit] != ' ')
@@ -1311,17 +1184,17 @@ namespace CPU_Simulator
                     if (instruction[addressBit] != '1' && instruction[addressBit] != '0')
                         parametersBinary = false;
 
-                    parameters += instruction[addressBit];
+                    else parameters += instruction[addressBit];
                 }
             }
 
-            //valid opcode
+            ///valid opcode and parameters
             if (parametersBinary && Globals.keywords.ContainsKey(opcode))
             {
-                //following instructions require 4 bit parameters (register A and B or flags)
+                //the following instructions require 4 bit parameters (RGA and RGB or flags)
                 if (parameters.Length != Globals.GPR_ADDRESS_SIZE * 2 &&
 
-                    //load, store and all ALU instructions (register model only)
+                    ///load, store and all ALU instructions (register model only)
                     ((registerMachine && 
                     (Globals.keywords[opcode] == Globals.OP_LOAD_POP || 
                     Globals.keywords[opcode] == Globals.OP_STORE_SWAP ||
@@ -1334,32 +1207,32 @@ namespace CPU_Simulator
                     Globals.keywords[opcode] == Globals.ALU_XOR ||
                     Globals.keywords[opcode] == Globals.ALU_COMPARE)) ||
 
-                    //jump if requires flag parameters (both CPU models)
+                    ///jump if requires flag parameters (both CPU models)
                     Globals.keywords[opcode] == Globals.OP_JUMP_IF))
                 {
                     MessageBox.Show("Incorrect number of parameters provided at line: " + lineNo);
                 }
 
-                //following instructions require 2 bit parameters (register B)
+                //the following instructions require 2 bit parameters (register B)
                 else if (parameters.Length != Globals.GPR_ADDRESS_SIZE &&
 
-                    //data and jump register (register model only)
+                    ///data and jump register (register model only)
                     registerMachine && (Globals.keywords[opcode] == Globals.OP_JUMP_RG_TOS || 
                     Globals.keywords[opcode] == Globals.OP_DATA_PUSH))
                 {
                     MessageBox.Show("Incorrect number of parameters provided at line: " + lineNo);
                 }
 
-                //following instructions require no parameters
+                //the following instructions require no parameters
                 else if (parameters.Length != 0 &&
 
-                    //jump (in register model only) 
+                    ///jump (in register model only) 
                     (((registerMachine && (Globals.keywords[opcode] == Globals.OP_JUMP)) || 
                     
-                    //reset (both CPU models)
+                    ///reset (both CPU models)
                     Globals.keywords[opcode] == Globals.OP_RESET_FLAGS) ||
                     
-                    //all stack instructions except jump if
+                    ///all stack instructions except jump if
                     (!registerMachine && Globals.keywords[opcode] != Globals.OP_JUMP_IF)))
                 {
                     MessageBox.Show("Incorrect number of parameters provided at line: " + lineNo);
@@ -1367,10 +1240,9 @@ namespace CPU_Simulator
 
                 else
                 {
-                    //initialise bitarray so instruction can be copied
                     newInstruction = new BitArray(Globals.WORD_SIZE);
 
-                    //put 2 0s in RGA for instructions that do not use it
+                    ///fill 0s in RGA for single parameter instructions
                     if (parameters.Length == Globals.GPR_ADDRESS_SIZE)
                     {
                         string blanks = "00";
@@ -1378,32 +1250,33 @@ namespace CPU_Simulator
                         parameters = blanks;
                     }
 
-                    //combine opcode and parameters
+                    ///combine opcode and parameters
                     fullInstruction = Globals.keywords[opcode] + parameters;
 
-                    //convert full instruction to bitarray
+                    ///convert full instruction to bitarray
                     for (int currentBit = 0; currentBit < Globals.WORD_SIZE && currentBit < fullInstruction.Length; currentBit++)
                         if (fullInstruction[currentBit] == '1') newInstruction[currentBit] = true;
                 }
             }
 
-            //line is an address or data
-            else if (opcode == Globals.ADDRESS || opcode == Globals.DATA) newInstruction = parseData(lineNo, parameters);
+            else if (opcode == Globals.ADDRESS || opcode == Globals.DATA)
+                newInstruction = parseData(lineNo, parameters);
 
-            //line is a halt
             else if (opcode == Globals.HALT)
             {
+                newInstruction = new BitArray(Globals.WORD_SIZE);
+
+                ///halt is used after final instruction
                 lastInstruction = lineNo - 1;
                 halt = true;
-                newInstruction = new BitArray(Globals.WORD_SIZE);
             }
 
-            //invalid parameters
+            ///invalid parameters
             else if (!parametersBinary)
-                MessageBox.Show("Invalid parameters: " + instruction + " at line " + lineNo + ". Instruction parameters must be in binary.");
+                MessageBox.Show("Invalid parameters at line: " + lineNo + ". Instruction parameters must be in binary.");
 
             //invalid instruction
-            else MessageBox.Show("Invalid opcode: " + opcode + " at line " + lineNo);
+            else MessageBox.Show("Invalid opcode: " + opcode + " at line: " + lineNo);
 
             if (newInstruction != null) return Globals.reverseBitArray(newInstruction);
             else return null;
@@ -1413,20 +1286,20 @@ namespace CPU_Simulator
         {
             BitArray data = null;
 
-            //cannot be more than 8 bits
+            ///cannot be more than 8 bits
             if (input.Length > Globals.WORD_SIZE)
                 MessageBox.Show("Invalid address/data: " + input + " at line " + lineNo + ". Must be 8 digits or less.");
 
-            //cannot be first instruction
+            ///cannot be first instruction
             else if (lineNo == 0)
                 MessageBox.Show("Invalid address/data: " + input + " at line " + lineNo + ". Cannot be first instruction.");
 
             else
             {
-                //initialise bitarray so instruction can be copied
+                ///initialise bitarray so instruction can be copied
                 data = new BitArray(Globals.WORD_SIZE);
 
-                //copy input to bitarray
+                ///copy input to bitarray
                 for (int inputBit = input.Length - 1, copyBit = Globals.WORD_SIZE - 1; inputBit >= 0; inputBit--, copyBit--)
                 {
                     if (input[inputBit] == '1') data[copyBit] = true;
@@ -1445,7 +1318,7 @@ namespace CPU_Simulator
 
         private void loadRegisterCPU()
         {
-            //link GUI events to CPU registers
+            ///create register CPU
             CU = new ControlUnit(instructions, accessRAMLocation, new byte[] { (byte)lastInstruction },
                 accessGPRContents, updateIARContents, updateIRContents, updateMARContents,
                 updateTMPContents, readBUS1, accessALU, updateAccumulatorContents,
@@ -1454,7 +1327,7 @@ namespace CPU_Simulator
 
         private void loadStackCPU()
         {
-            //create CPU and link methods to respond to events
+            ///create stack CPU
             CU = new ControlUnit(instructions, accessRAMLocation, new byte[] { (byte)lastInstruction }, 
                 pushPopStack, accessStack, readTMPToBus,
                 updateIARContents, updateIRContents, updateMARContents,
@@ -1466,10 +1339,10 @@ namespace CPU_Simulator
         {
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
+
             showWelcomeScreen();
         }
 
-        //CPU state changes
         public void updateIARContents(BitArray address, bool accessMode)
         {
             if (InvokeRequired) Invoke(new ReadWriteRegister(updateIARContents), new object[] { address, accessMode });
@@ -1483,11 +1356,9 @@ namespace CPU_Simulator
                     controlWire.Width = 2;
 
                     //read process
-                    //------------------------------------------------
-                    circuit.DrawLine(controlWire, 365, 395, 365, 375);  //activate enable wire
-                    enableBus();                                        //data flows onto the bus
-                    lblIARContents.ForeColor = Globals.READ_COLOR;       //highlight data (visual aid)
-                    //------------------------------------------------
+                    circuit.DrawLine(controlWire, 365, 395, 365, 375);  ///activate enable wire
+                    enableBus();                                        ///data flows onto the bus
+                    lblIARContents.ForeColor = Globals.READ_COLOR;      ///highlight data (visual aid)
 
                     controlWire.Dispose();
                 }
@@ -1498,11 +1369,9 @@ namespace CPU_Simulator
                     controlWire.Width = 2;
 
                     //write process
-                    //------------------------------------------------------
-                    circuit.DrawLine(controlWire, 370, 395, 370, 375);          //activate set wire
-                    lblIARContents.Text = Globals.convertBitsToString(address);    //data flows into memory (contents changed)
-                    lblIARContents.ForeColor = Globals.WRITE_COLOR;              //highlight data (visual aid)
-                    //------------------------------------------------------
+                    circuit.DrawLine(controlWire, 370, 395, 370, 375);              ///activate set wire
+                    lblIARContents.Text = Globals.convertBitsToString(address);     ///data flows into memory (contents changed)
+                    lblIARContents.ForeColor = Globals.WRITE_COLOR;                 ///highlight data (visual aid)
 
                     controlWire.Dispose();
                 }
@@ -1524,16 +1393,14 @@ namespace CPU_Simulator
                     controlWire.Width = 2;
 
                     //read process
-                    //----------------------------------------------------------------
-                    int xPos = 485;                                                     //position of leftmost opcode wire
-                    for (int count = 0; count < Globals.WORD_SIZE; count++, xPos += 3)  //move to next wire along horizontal axis
+                    int xPos = 485;                                                     ///position of leftmost opcode wire
+                    for (int count = 0; count < Globals.WORD_SIZE; count++, xPos += 3)  ///move to next wire along horizontal axis
                     {
-                        if (lblIRContents.Text.ElementAt(count) == '1')                 //active opcode bits flow through the..
-                            circuit.DrawLine(controlWire, xPos, 395, xPos, 375);        //..corresponding wire
+                        if (lblIRContents.Text.ElementAt(count) == '1')                 ///active opcode bits flow through the
+                            circuit.DrawLine(controlWire, xPos, 395, xPos, 375);        ///corresponding wire
                     }
 
                     lblIRContents.ForeColor = Globals.READ_COLOR;
-                    //----------------------------------------------------------------
 
                     controlWire.Dispose();
                 }
@@ -1544,11 +1411,9 @@ namespace CPU_Simulator
                     controlWire.Width = 2;
 
                     //write process
-                    //-----------------------------------------------------
-                    circuit.DrawLine(controlWire, 530, 395, 530, 375);      //activate set wire
-                    lblIRContents.Text = Globals.convertBitsToString(instruction); //data flows into memory (contents changed)
-                    lblIRContents.ForeColor = Globals.WRITE_COLOR;           //highlight data (visual aid)
-                    //-----------------------------------------------------
+                    circuit.DrawLine(controlWire, 530, 395, 530, 375);                  ///activate set wire
+                    lblIRContents.Text = Globals.convertBitsToString(instruction);      ///data flows into memory (contents changed)
+                    lblIRContents.ForeColor = Globals.WRITE_COLOR;                      ///highlight data (visual aid)
 
                     controlWire.Dispose();
                 }
@@ -1570,11 +1435,9 @@ namespace CPU_Simulator
                     controlWire.Width = 2;
 
                     //read process
-                    //-----------------------------------------------
-                    circuit.DrawLine(controlWire, 430, 60, 430, 175);   //activate enable wire
-                    enableBus();                                        //data flows onto the bus
-                    lblMARContents.ForeColor = Globals.READ_COLOR;       //highlight data (visual aid)
-                    //-----------------------------------------------
+                    circuit.DrawLine(controlWire, 430, 60, 430, 175);   ///activate enable wire
+                    enableBus();                                        ///data flows onto the bus
+                    lblMARContents.ForeColor = Globals.READ_COLOR;      ///highlight data (visual aid)
 
                     controlWire.Dispose();
                 }
@@ -1585,11 +1448,9 @@ namespace CPU_Simulator
                     controlWire.Width = 2;
 
                     //write process
-                    //------------------------------------------------------
-                    circuit.DrawLine(controlWire, 435, 60, 435, 175);           //activate set wire
-                    lblMARContents.Text = Globals.convertBitsToString(address);    //data flows into memory (contents changed)
-                    lblMARContents.ForeColor = Globals.WRITE_COLOR;              //highlight data (visual aid)
-                    //------------------------------------------------------
+                    circuit.DrawLine(controlWire, 435, 60, 435, 175);               ///activate set wire
+                    lblMARContents.Text = Globals.convertBitsToString(address);     ///data flows into memory (contents changed)
+                    lblMARContents.ForeColor = Globals.WRITE_COLOR;                 ///highlight data (visual aid)
 
                     controlWire.Dispose();
                 }
@@ -1614,22 +1475,20 @@ namespace CPU_Simulator
                     controlWire.Width = 2;
 
                     //read process
-                    //-----------------------------------------------
-                    //activate enable wire
+                    ///activate enable wire
                     circuit.DrawLine(controlWire, 160, 75, 325, 75);
                     circuit.DrawLine(controlWire, 325, 75, 325, 175);
 
-                    //data flows into BUS1
+                    ///data flows into BUS1
                     circuit.DrawLine(bus, 117.5f, 110, 117.5f, 130);
                     circuit.DrawLine(bus, 122.5f, 110, 122.5f, 130);
 
-                    //continues flow through BUS1 to ALU
+                    ///continues flow through BUS1 to ALU
                     circuit.DrawLine(bus, 117.5f, 155, 117.5f, 180);
                     circuit.DrawLine(bus, 122.5f, 155, 122.5f, 180);
 
-                    //highlight data (visual aid)
+                    ///highlight data (visual aid)
                     lblTMPContents.ForeColor = Globals.READ_COLOR;
-                    //-----------------------------------------------
 
                     controlWire.Dispose();
                     bus.Dispose();
@@ -1641,13 +1500,12 @@ namespace CPU_Simulator
                     controlWire.Width = 2;
 
                     //write process
-                    //------------------------------------------------------
-                    //activate set wire
+                    ///activate set wire
                     circuit.DrawLine(controlWire, 160, 80, 320, 80);
                     circuit.DrawLine(controlWire, 320, 80, 320, 175);
 
-                    lblTMPContents.Text = Globals.convertBitsToString(data);    //data flows into memory (contents changed)
-                    lblTMPContents.ForeColor = Globals.WRITE_COLOR;             //highlight data (visual aid)
+                    lblTMPContents.Text = Globals.convertBitsToString(data);    ///data flows into memory (contents changed)
+                    lblTMPContents.ForeColor = Globals.WRITE_COLOR;             ///highlight data (visual aid)
                     //------------------------------------------------------
 
                     controlWire.Dispose();
@@ -1667,17 +1525,12 @@ namespace CPU_Simulator
                 controlWire.Width = 2;
 
                 //read process
-                //-----------------------------------------------
-                //activate enable wire
+                ///activate enable wire
                 circuit.DrawLine(controlWire, 160, 75, 325, 75);
                 circuit.DrawLine(controlWire, 325, 75, 325, 175);
 
-                //highlight data (visual aid)
-                lblTMPContents.ForeColor = Globals.READ_COLOR;
-
-                //data flows onto bus
-                enableBus();
-                //-----------------------------------------------
+                lblTMPContents.ForeColor = Globals.READ_COLOR;      ///highlight data (visual aid)
+                enableBus();                                        ///data flows onto bus
 
                 controlWire.Dispose();
                 circuit.Dispose();
@@ -1697,14 +1550,12 @@ namespace CPU_Simulator
                     controlWire.Width = 2;
 
                     //read process
-                    //---------------------------------------------------
-                    //activate enable wire
+                    ///activate enable wire
                     circuit.DrawLine(controlWire, 130, 410, 285, 410);
                     circuit.DrawLine(controlWire, 285, 410, 285, 375);
 
-                    enableBus();                                            //data flows onto the bus
-                    lblAccContents.ForeColor = Globals.READ_COLOR;          //highlight data (visual aid)
-                    //---------------------------------------------------
+                    enableBus();                                            ///data flows onto the bus
+                    lblAccContents.ForeColor = Globals.READ_COLOR;          ///highlight data (visual aid)
 
                     controlWire.Dispose();
                 }
@@ -1718,18 +1569,16 @@ namespace CPU_Simulator
                     controlWire.Width = 2;
 
                     //write process
-                    //--------------------------------------------------------------
-                    //activate set wire
+                    ///activate set wire
                     circuit.DrawLine(controlWire, 130, 415, 290, 415);
                     circuit.DrawLine(controlWire, 290, 415, 290, 375);
 
-                    //data flows from ALU to accumulator
+                    ///data flows from ALU to accumulator
                     circuit.DrawLine(bus, 87.5f, 375, 87.5f, 395);
                     circuit.DrawLine(bus, 92.5f, 375, 92.5f, 395);
 
-                    lblAccContents.Text = Globals.convertBitsToString(data);    //data flows into memory (contents changed)
-                    lblAccContents.ForeColor = Globals.WRITE_COLOR;              //highlight data (visual aid)
-                    //--------------------------------------------------------------
+                    lblAccContents.Text = Globals.convertBitsToString(data);    ///data flows into memory (contents changed)
+                    lblAccContents.ForeColor = Globals.WRITE_COLOR;             ///highlight data (visual aid)
 
                     controlWire.Dispose();
                     bus.Dispose();
@@ -1753,94 +1602,90 @@ namespace CPU_Simulator
                 if (accessMode == Globals.REGISTER_READ)
                 {
                     //read process
-                    //------------------------------------------------
-                    circuit.DrawLine(controlWire, 245, 280, 275, 280);  //data flows from COUT to CU
-                    circuit.DrawLine(controlWire, 245, 300, 275, 300);  //data flows from A LARGER to CU
-                    circuit.DrawLine(controlWire, 245, 320, 275, 320);  //data flows from EQUALS to CU
-                    circuit.DrawLine(controlWire, 245, 340, 275, 340);  //data flows from ZERO to CU
+                    circuit.DrawLine(controlWire, 245, 280, 275, 280);  ///data flows from COUT to CU
+                    circuit.DrawLine(controlWire, 245, 300, 275, 300);  ///data flows from A LARGER to CU
+                    circuit.DrawLine(controlWire, 245, 320, 275, 320);  ///data flows from EQUALS to CU
+                    circuit.DrawLine(controlWire, 245, 340, 275, 340);  ///data flows from ZERO to CU
 
-                    //data flows from COUT back to CIN
+                    ///data flows from COUT back to CIN
                     circuit.DrawLine(controlWire, 260, 280, 260, 230);  
                     circuit.FillEllipse(wireJoint, 255, 275, 8, 8);
                     circuit.DrawLine(controlWire, 260, 230, 140, 230);
 
-                    //highlight data (visual aid)
+                    ///highlight data (visual aid)
                     lblCoutContents.ForeColor = Globals.READ_COLOR;
                     lblALargerContents.ForeColor = Globals.READ_COLOR;
                     lblEqualContents.ForeColor = Globals.READ_COLOR;
                     lblZeroContents.ForeColor = Globals.READ_COLOR;
-                    //------------------------------------------------
                 }
 
                 else if (accessMode == Globals.REGISTER_WRITE)
                 {
                     //write process
-                    //--------------------------------------------------------
-                    circuit.DrawLine(controlWire, 245, 360, 275, 360);          //activate set wire
+                    circuit.DrawLine(controlWire, 245, 360, 275, 360);          ///activate set wire
 
                     switch (flagIndex)
                     {
                         case Globals.COUT_FLAG:
-                            circuit.DrawLine(controlWire, 140, 280, 170, 280);  //data flows from ALU to COUT
-                            circuit.DrawLine(controlWire, 245, 280, 275, 280);  //continues flow to CU
+                            circuit.DrawLine(controlWire, 140, 280, 170, 280);  ///data flows from ALU to COUT
+                            circuit.DrawLine(controlWire, 245, 280, 275, 280);  ///continues flow to CU
 
-                            //data flows from COUT back to CIN
+                            ///data flows from COUT back to CIN
                             circuit.DrawLine(controlWire, 260, 280, 260, 230);  
                             circuit.FillEllipse(wireJoint, 255, 275, 8, 8);     
                             circuit.DrawLine(controlWire, 260, 230, 140, 230);   
 
-                            lblCoutContents.Text = "1";                         //data flows into memory (contents changed)
-                            lblCoutContents.ForeColor = Globals.WRITE_COLOR;    //highlight data (visual aid)
+                            lblCoutContents.Text = "1";                         ///data flows into memory (contents changed)
+                            lblCoutContents.ForeColor = Globals.WRITE_COLOR;    ///highlight data (visual aid)
                             break;
 
                         case Globals.EQUAL_FLAG:
-                            circuit.DrawLine(controlWire, 140, 320, 170, 320);  //data flows from ALU to EQUAL
-                            circuit.DrawLine(controlWire, 245, 320, 275, 320);  //continues flow to CU
+                            circuit.DrawLine(controlWire, 140, 320, 170, 320);  ///data flows from ALU to EQUAL
+                            circuit.DrawLine(controlWire, 245, 320, 275, 320);  ///continues flow to CU
 
-                            lblEqualContents.Text = "1";                        //data flows into memory (contents changed)
-                            lblEqualContents.ForeColor = Globals.WRITE_COLOR;   //highlight data (visual aid)
+                            lblEqualContents.Text = "1";                        ///data flows into memory (contents changed)
+                            lblEqualContents.ForeColor = Globals.WRITE_COLOR;   ///highlight data (visual aid)
                             break;
 
                         case Globals.A_LARGER_FLAG:
-                            circuit.DrawLine(controlWire, 140, 300, 170, 300);  //data flows from ALU to A LARGER
-                            circuit.DrawLine(controlWire, 245, 300, 275, 300);  //continues flow to CU
+                            circuit.DrawLine(controlWire, 140, 300, 170, 300);  ///data flows from ALU to A LARGER
+                            circuit.DrawLine(controlWire, 245, 300, 275, 300);  ///continues flow to CU
 
-                            lblALargerContents.Text = "1";                      //data flows into memory (contents changed)
-                            lblALargerContents.ForeColor = Globals.WRITE_COLOR; //highlight data (visual aid)
+                            lblALargerContents.Text = "1";                      ///data flows into memory (contents changed)
+                            lblALargerContents.ForeColor = Globals.WRITE_COLOR; ///highlight data (visual aid)
                             break;
 
                         case Globals.ZERO_FLAG:
-                            circuit.DrawLine(controlWire, 140, 340, 170, 340);  //data flows from ALU to ZERO
-                            circuit.DrawLine(controlWire, 245, 340, 275, 340);  //continues flow to CU
+                            circuit.DrawLine(controlWire, 140, 340, 170, 340);  ///data flows from ALU to ZERO
+                            circuit.DrawLine(controlWire, 245, 340, 275, 340);  ///continues flow to CU
 
-                            lblZeroContents.Text = "1";                         //data flows into memory (contents changed)
-                            lblZeroContents.ForeColor = Globals.WRITE_COLOR;    //highlight data (visual aid)
+                            lblZeroContents.Text = "1";                         ///data flows into memory (contents changed)
+                            lblZeroContents.ForeColor = Globals.WRITE_COLOR;    ///highlight data (visual aid)
                             break;
 
                         default:
-                            //data flows into memory (contents changed)
+                            ///data flows into memory (contents changed)
                             lblCoutContents.Text = "0";
                             lblALargerContents.Text = "0";
                             lblEqualContents.Text = "0";
                             lblZeroContents.Text = "0";
 
-                            circuit.DrawLine(controlWire, 245, 280, 275, 280);  //data flows from COUT to CU
-                            circuit.DrawLine(controlWire, 245, 300, 275, 300);  //data flows from A LARGER to CU
-                            circuit.DrawLine(controlWire, 245, 320, 275, 320);  //data flows from EQUALS to CU
-                            circuit.DrawLine(controlWire, 245, 340, 275, 340);  //data flows from ZERO to CU
+                            circuit.DrawLine(controlWire, 245, 280, 275, 280);  ///data flows from COUT to CU
+                            circuit.DrawLine(controlWire, 245, 300, 275, 300);  ///data flows from A LARGER to CU
+                            circuit.DrawLine(controlWire, 245, 320, 275, 320);  ///data flows from EQUALS to CU
+                            circuit.DrawLine(controlWire, 245, 340, 275, 340);  ///data flows from ZERO to CU
 
-                            //data flows from COUT back to CIN
+                            ///data flows from COUT back to CIN
                             circuit.DrawLine(controlWire, 260, 280, 260, 230);
                             circuit.FillEllipse(wireJoint, 255, 275, 8, 8);
                             circuit.DrawLine(controlWire, 260, 230, 140, 230);
 
-                            //highlight data (visual aid)
+                            ///highlight data (visual aid)
                             lblCoutContents.ForeColor = Globals.WRITE_COLOR;
                             lblALargerContents.ForeColor = Globals.WRITE_COLOR;
                             lblEqualContents.ForeColor = Globals.WRITE_COLOR;
                             lblZeroContents.ForeColor = Globals.WRITE_COLOR;
                             break;
-                    //--------------------------------------------------------
                     }
                 }
 
@@ -1859,8 +1704,8 @@ namespace CPU_Simulator
                 {
                     Graphics circuit = CreateGraphics();
 
-                    lblRAMAddress.Text = "Addr " + address.ToString();          //indicate address being accessed
-                    lblRAMContents.Text = Globals.convertBitsToString(data);    //show contents of address
+                    lblRAMAddress.Text = "Addr " + address.ToString();          ///indicate address being accessed
+                    lblRAMContents.Text = Globals.convertBitsToString(data);    ///show contents of address
 
                     if (accessMode == Globals.REGISTER_READ)
                     {
@@ -1868,11 +1713,9 @@ namespace CPU_Simulator
                         controlWire.Width = 2;
 
                         //read process
-                        //-----------------------------------------------
-                        circuit.DrawLine(controlWire, 515, 60, 515, 175);   //activate enable wire
-                        enableBus();                                        //data flows onto the bus
-                        lblRAMContents.ForeColor = Globals.READ_COLOR;       //highlight data (visual aid)
-                        //-----------------------------------------------
+                        circuit.DrawLine(controlWire, 515, 60, 515, 175);   ///activate enable wire
+                        enableBus();                                        ///data flows onto the bus
+                        lblRAMContents.ForeColor = Globals.READ_COLOR;      ///highlight data (visual aid)
 
                         controlWire.Dispose();
                     }
@@ -1883,10 +1726,8 @@ namespace CPU_Simulator
                         controlWire.Width = 2;
 
                         //write process
-                        //-----------------------------------------------
-                        circuit.DrawLine(controlWire, 520, 60, 520, 175);   //activate set wire
-                        lblRAMContents.ForeColor = Globals.WRITE_COLOR;      //highlight data (visual aid)
-                        //-----------------------------------------------
+                        circuit.DrawLine(controlWire, 520, 60, 520, 175);   ///activate set wire
+                        lblRAMContents.ForeColor = Globals.WRITE_COLOR;     ///highlight data (visual aid)
 
                         controlWire.Dispose();
                     }
@@ -1911,8 +1752,7 @@ namespace CPU_Simulator
                         controlWire.Width = 2;
 
                         //read process
-                        //--------------------------------------------------------
-                        //activate enable wire for selected GPR
+                        ///activate enable wire for selected GPR
                         switch (GPRIndex)
                         {
                             case 0:
@@ -1931,9 +1771,8 @@ namespace CPU_Simulator
                                 break;
                         }
 
-                        enableBus();                                                //data flows onto the bus
-                        lblGPRContents[GPRIndex].ForeColor = Globals.READ_COLOR;     //highlight data (visual aid)
-                        //--------------------------------------------------------
+                        enableBus();                                                ///data flows onto the bus
+                        lblGPRContents[GPRIndex].ForeColor = Globals.READ_COLOR;    ///highlight data (visual aid)
 
                         controlWire.Dispose();
                     }
@@ -1944,8 +1783,7 @@ namespace CPU_Simulator
                         controlWire.Width = 2;
 
                         //write process
-                        //----------------------------------------------------------------
-                        //activate set wire for selected GPR
+                        ///activate set wire for selected GPR
                         switch (GPRIndex)
                         {
                             case 0:
@@ -1964,9 +1802,8 @@ namespace CPU_Simulator
                                 break;
                         }
                         
-                        lblGPRContents[GPRIndex].Text = Globals.convertBitsToString(data);  //data flows into memory (contents changed)
-                        lblGPRContents[GPRIndex].ForeColor = Globals.WRITE_COLOR;            //highlight data (visual aid)
-                        //----------------------------------------------------------------
+                        lblGPRContents[GPRIndex].Text = Globals.convertBitsToString(data);  ///data flows into memory (contents changed)
+                        lblGPRContents[GPRIndex].ForeColor = Globals.WRITE_COLOR;           ///highlight data (visual aid)
 
                         controlWire.Dispose();
                     }
@@ -1987,74 +1824,65 @@ namespace CPU_Simulator
 
                     if (accessMode == Globals.REGISTER_READ)
                     {
-                        //top element, copy into TOS
+                        ///copy top layer to TOS
                         if (stackIndex == 0)
                         {
                             Pen controlWire = new Pen(Globals.READ_COLOR);
                             controlWire.Width = 2;
 
                             //read process
-                            //----------------------------------------------------------
-                            circuit.DrawLine(controlWire, 655, 190, 625, 190);              //activate enable wire
-                            lblStackContents[stackIndex].ForeColor = Globals.READ_COLOR;    //highlight data (visual aid)
-                            enableBus();                                                    //data flows onto the bus
+                            circuit.DrawLine(controlWire, 655, 190, 625, 190);              ///activate enable wire
+                            lblStackContents[stackIndex].ForeColor = Globals.READ_COLOR;    ///highlight data (visual aid)
+                            enableBus();                                                    ///data flows onto the bus
 
-                            //write to TOS
+                            ///write to TOS
                             updateTMPContents(Globals.convertStringToBits(lblStackContents[stackIndex].Text), Globals.REGISTER_WRITE);
-                            //----------------------------------------------------------
 
                             controlWire.Dispose();
                         }
 
                         else
                         {
-                            //shift data in current element to element above
-                            lblStackContents[stackIndex].ForeColor = Globals.READ_COLOR;                //highlight data (visual aid)
-                            lblStackContents[stackIndex - 1].Text = lblStackContents[stackIndex].Text;  //shift data up
-                            lblStackContents[stackIndex - 1].ForeColor = Globals.WRITE_COLOR;           //highlight data (visual aid)
+                            ///shift layer up
+                            lblStackContents[stackIndex].ForeColor = Globals.READ_COLOR;                ///highlight data (visual aid)
+                            lblStackContents[stackIndex - 1].Text = lblStackContents[stackIndex].Text;  ///shift data up
+                            lblStackContents[stackIndex - 1].ForeColor = Globals.WRITE_COLOR;           ///highlight data (visual aid)
                         }
                     }
 
                     else if (accessMode == Globals.REGISTER_WRITE)
                     {
-                        //copy TOS to top of stack first
+                        ///copy TOS to top layer
                         if (stackIndex == 0)
                         {
                             Pen controlWire = new Pen(Globals.READ_COLOR);
                             controlWire.Width = 2;
 
                             //read from TOS
-                            //-----------------------------------------------
-                            //activate enable wire
+                            ///activate enable wire
                             circuit.DrawLine(controlWire, 160, 75, 325, 75);
                             circuit.DrawLine(controlWire, 325, 75, 325, 175);
  
-                            //highlight data (visual aid)
-                            lblTMPContents.ForeColor = Globals.READ_COLOR;
-
-                            //data flows onto the bus
-                            enableBus();
-                            //-----------------------------------------------
+                            lblTMPContents.ForeColor = Globals.READ_COLOR;      ///highlight data (visual aid)
+                            enableBus();                                        ///data flows onto the bus
 
                             controlWire = new Pen(Globals.WRITE_COLOR);
                             controlWire.Width = 2;
 
                             //write process
-                            //-----------------------------------------------------------
-                            circuit.DrawLine(controlWire, 655, 185, 625, 185);              //activate set wire
-                            lblStackContents[stackIndex].Text = lblTMPContents.Text;        //copy data from TOS to top of stack
-                            lblStackContents[stackIndex].ForeColor = Globals.WRITE_COLOR;   //highlight data (visual aid)
-                            //-----------------------------------------------------------
+                            circuit.DrawLine(controlWire, 655, 185, 625, 185);              ///activate set wire
+                            lblStackContents[stackIndex].Text = lblTMPContents.Text;        ///copy data from TOS to top of stack
+                            lblStackContents[stackIndex].ForeColor = Globals.WRITE_COLOR;   ///highlight data (visual aid)
 
                             controlWire.Dispose();
                         }
 
                         else
                         {
-                            //shift data from memory above into current memory
-                            lblStackContents[stackIndex - 1].ForeColor = Globals.READ_COLOR;            //highlight data (visual aid)
-                            lblStackContents[stackIndex].Text = lblStackContents[stackIndex - 1].Text;  //shift data down
-                            lblStackContents[stackIndex].ForeColor = Globals.WRITE_COLOR;               //highlight data (visual aid)
+                            ///shift layer down
+                            lblStackContents[stackIndex - 1].ForeColor = Globals.READ_COLOR;            ///highlight data (visual aid)
+                            lblStackContents[stackIndex].Text = lblStackContents[stackIndex - 1].Text;  ///shift data down
+                            lblStackContents[stackIndex].ForeColor = Globals.WRITE_COLOR;               ///highlight data (visual aid)
                         }
                     }
 
@@ -2076,11 +1904,9 @@ namespace CPU_Simulator
                     controlWire.Width = 2;
 
                     //read process
-                    //-------------------------------------------------
-                    circuit.DrawLine(controlWire, 655, 190, 625, 190);      //activate enable wire
-                    lblStackContents[0].ForeColor = Globals.READ_COLOR;     //highlight data (visual aid)
-                    enableBus();                                            //data flows onto the bus
-                    //-------------------------------------------------
+                    circuit.DrawLine(controlWire, 655, 190, 625, 190);      ///activate enable wire
+                    lblStackContents[0].ForeColor = Globals.READ_COLOR;     ///highlight data (visual aid)
+                    enableBus();                                            ///data flows onto the bus
 
                     controlWire.Dispose();
                 }
@@ -2091,11 +1917,9 @@ namespace CPU_Simulator
                     controlWire.Width = 2;
 
                     //read process
-                    //-----------------------------------------------------------
-                    circuit.DrawLine(controlWire, 655, 185, 625, 185);              //activate set wire
-                    lblStackContents[0].Text = Globals.convertBitsToString(data);   //copy data to top of stack
-                    lblStackContents[0].ForeColor = Globals.WRITE_COLOR;            //highlight data (visual aid)
-                    //-----------------------------------------------------------
+                    circuit.DrawLine(controlWire, 655, 185, 625, 185);              ///activate set wire
+                    lblStackContents[0].Text = Globals.convertBitsToString(data);   ///copy data to top of stack
+                    lblStackContents[0].ForeColor = Globals.WRITE_COLOR;            ///highlight data (visual aid)
 
                     controlWire.Dispose();
                 }
@@ -2118,15 +1942,13 @@ namespace CPU_Simulator
                 controlWire.Width = 2;
 
                 //read process
-                //------------------------------------------------
-                //activate enable wire
+                ///activate enable wire
                 circuit.DrawLine(controlWire, 151, 140, 285, 140);
                 circuit.DrawLine(controlWire, 285, 140, 285, 175);
 
-                //data flows from BUS1 to ALU
+                ///data flows from BUS1 to ALU
                 circuit.DrawLine(bus, 117.5f, 155, 117.5f, 180);
                 circuit.DrawLine(bus, 122.5f, 155, 122.5f, 180);
-                //------------------------------------------------
 
                 controlWire.Dispose();
                 bus.Dispose();
@@ -2144,12 +1966,10 @@ namespace CPU_Simulator
                 Pen controlWire = new Pen(Globals.READ_COLOR);
                 controlWire.Width = 2;
 
-                //active opcode bits flow through the corresponding wire
-                //--------------------------------------------------------------
+                ///active opcode bits flow through the corresponding wire
                 if (opcode[0]) circuit.DrawLine(controlWire, 140, 190, 275, 190);
                 if (opcode[1]) circuit.DrawLine(controlWire, 140, 194, 275, 194);
                 if (opcode[2]) circuit.DrawLine(controlWire, 140, 198, 275, 198);
-                //--------------------------------------------------------------
 
                 controlWire.Dispose();
                 circuit.Dispose();
@@ -2256,19 +2076,19 @@ namespace CPU_Simulator
 
         public InstructionForm(bool registerMachine)
         {
-            string image;
-
             ClientSize = new Size(1000, 563);
             Text = "Instructions";
             MaximizeBox = false;
             FormBorderStyle = FormBorderStyle.FixedSingle;
+
+            string image;
 
             if (registerMachine) image = @"assets\register_table.png";
             else image = @"assets\stack_table.png";
 
             try
             {
-                //load instruction table image
+                ///load instruction table image
                 instructionTable.Image = new Bitmap(image);
                 instructionTable.Size = new Size(1000, 563);
                 instructionTable.SizeMode = PictureBoxSizeMode.StretchImage;
@@ -2291,36 +2111,36 @@ namespace CPU_Simulator
         public const int OPCODE_SIZE = WORD_SIZE / 2;
         public const int GPR_ADDRESS_SIZE = 2;
 
-        public const int WORD_START = WORD_SIZE - 1;        //word stored as big endian
-        public const int OPCODE_START = OPCODE_SIZE - 1;    //opcode also big endian
+        public const int WORD_START = WORD_SIZE - 1;        ///word stored as big endian
+        public const int OPCODE_START = OPCODE_SIZE - 1;    ///opcode also big endian
         public const int ALU_OPCODE = OPCODE_START;
                     
         public const string 
-            //stack and register opcodes
+            ///stack and register opcodes
             OP_LOAD_POP = "0000", OP_STORE_SWAP = "0001", OP_DATA_PUSH = "0010", OP_JUMP_RG_TOS = "0011",
             OP_JUMP = "0100", OP_JUMP_IF = "0101", OP_RESET_FLAGS = "0110", OP_IO = "0111",
                             
-            //ALU opcodes
+            ///ALU opcodes
             ALU_ADD = "1000", ALU_R_SHIFT = "1001", ALU_L_SHIFT = "1010", ALU_NOT = "1011", 
             ALU_AND = "1100", ALU_OR = "1101", ALU_XOR = "1110", ALU_COMPARE = "1111";
 
         //map keywords to opcodes
         public static Dictionary<string, string> keywords = new Dictionary<string, string>
         {
-            //stack and register keywords
+            ///stack and register keywords
             { "LD", OP_LOAD_POP }, { "STR", OP_STORE_SWAP }, { "DAT", OP_DATA_PUSH }, { "JRG", OP_JUMP_RG_TOS },
             { "POP", OP_LOAD_POP }, { "SWP", OP_STORE_SWAP }, { "PSH", OP_DATA_PUSH }, { "JTS", OP_JUMP_RG_TOS },
             { "JMP", OP_JUMP }, { "JIF", OP_JUMP_IF }, { "RES", OP_RESET_FLAGS }, { "IO", OP_IO },
 
-            //ALU keywords
+            ///ALU keywords
             { "ADD", ALU_ADD }, { "RSH", ALU_R_SHIFT }, { "LSH", ALU_L_SHIFT }, { "NOT", ALU_NOT }, { "AND", ALU_AND },
             { "OR", ALU_OR }, { "XOR", ALU_XOR }, { "CMP", ALU_COMPARE }
         };
 
-        //additional keywords
+        ///additional keywords
         public const string ADDRESS = "ADR", DATA = "VAL", HALT = "HLT";
 
-        //indexes of flags are reversed to support BitArray big endian format 
+        ///indexes of flags are reversed to support BitArray big endian format 
         public const int COUT_FLAG = 3, A_LARGER_FLAG = 2, EQUAL_FLAG = 1, ZERO_FLAG = 0; 
 
         //available memory
@@ -2394,10 +2214,9 @@ namespace CPU_Simulator
 
         private BitArray contents = new BitArray(Globals.WORD_SIZE);
 
-        //no event assigned, used for registers that require specialised events (i.e. RAM and GPRs need an address)
+        ///no event assigned, used for generic registers (GPRs, RAM)
         public Register() { }
 
-        //event assigned for registers that have generic read and write events (i.e IR, MAR etc., don't require an address)
         public Register(ReadWriteRegister readWriteContents) { ReadWriteContents += readWriteContents; }
 
         //access contents without invoking event
@@ -2433,15 +2252,15 @@ namespace CPU_Simulator
         {
             ReadWriteContents += readWriteContents;
 
-            //load instructions into memory
+            ///load instructions into memory
             for (int count = 0; count < instructions.Length; count++)
             {
                 contents[count] = new Register();
                 contents[count].overwriteContents(instructions[count]);
             }
 
-            //create instances of empty memory where instructions end
-            //e.g. last instruction loc 34, 35-255 will be empty
+            ///create instances of empty memory where instructions end
+            ///e.g. last instruction loc 34, 35-255 will be empty
             for (int count = instructions.Length; count < Globals.RAM_SIZE; count++)
                 contents[count] = new Register();
         }
@@ -2479,20 +2298,20 @@ namespace CPU_Simulator
 
     public class ALU
     {
-        public event ReadOnlyRegister ReadBUS1;         //indicate BUS1 active
-        public event ReadWriteFlags ReadWriteFlags;     //update flag with its new data (write), or indicate it is being accessed (read)
+        public event ReadOnlyRegister ReadBUS1;         ///indicate BUS1 active
+        public event ReadWriteFlags ReadWriteFlags;     ///update flag with its new data (write), or indicate it is being accessed (read)
 
-        private bool BUS1 = false;  //toggle BUS1 enabled state
-        public Register TMP;        //also TOS register (stack machine)
+        private bool BUS1 = false;  ///toggle BUS1 enabled state
+        public Register TMP;        ///also TOS register (in stack machine)
 
-        //flag registers
+        ///flag registers
         public bool[] flags = new bool[Globals.NO_OF_FLAGS];
 
         public ALU(ReadWriteRegister readWriteTMP, ReadOnlyRegister readBUS1, ReadWriteFlags readWriteFlags)
         {
             TMP = new Register(readWriteTMP);
 
-            //flags
+            ///flags
             for (int count = 0; count < Globals.NO_OF_FLAGS; count++)
                 flags[count] = false;
 
@@ -2514,56 +2333,56 @@ namespace CPU_Simulator
         {
             BitArray secondNumber, result = new BitArray(Globals.WORD_SIZE);
 
-            if (BUS1) secondNumber = new BitArray(new byte[] { 1 });    //ignore TMP input, output value 1
-            else secondNumber = new BitArray(TMP.readContents());       //read contents of TMP
+            if (BUS1) secondNumber = new BitArray(new byte[] { 1 });    ///ignore TMP input, output value 1
+            else secondNumber = new BitArray(TMP.readContents());       ///read contents of TMP
 
             bool carryOut = false;
-            for (int count = 0; count < Globals.WORD_SIZE; count++)     //add from LSB upwards
+            for (int count = 0; count < Globals.WORD_SIZE; count++)     ///add from LSB upwards
             {
-                //last add caused a carry
+                ///last add caused a carry
                 if (carryOut)
                 {
-                    //1 no carry
+                    ///1 no carry
                     if (firstNumber[count] == false && secondNumber[count] == false)
                     {
                         result[count] = true;
                         carryOut = false;
                     }
 
-                    //1 carry
+                    ///1 carry
                     else if (firstNumber[count] == true && secondNumber[count] == true)
                         result[count] = true;
 
-                    //0 carry
+                    ///0 carry
                     else result[count] = false;
                 }
 
                 else
                 {
-                    //0 no carry
+                    ///0 no carry
                     if (firstNumber[count] == false && secondNumber[count] == false)
                         result[count] = false;
 
-                    //0 carry
+                    ///0 carry
                     else if (firstNumber[count] == true && secondNumber[count] == true)
                     {
                         result[count] = false;
                         carryOut = true;
                     }
 
-                    //1 no carry
+                    ///1 no carry
                     else result[count] = true;
                 }
             }
 
-            //last add caused carry
+            ///last add caused carry
             if (carryOut)
             {
                 ReadWriteFlags?.Invoke(Globals.REGISTER_WRITE, Globals.COUT_FLAG);
                 flags[Globals.COUT_FLAG] = true;
             }
 
-            //result was 0
+            ///result was 0
             if (Globals.areBitsEqual(result, new BitArray(Globals.WORD_SIZE)))
             {
                 ReadWriteFlags?.Invoke(Globals.REGISTER_WRITE, Globals.ZERO_FLAG);
@@ -2577,18 +2396,18 @@ namespace CPU_Simulator
         {
             BitArray result = new BitArray(Globals.WORD_SIZE);
 
-            //LSB is 1, will be shifted out
+            ///LSB is 1, will be shifted out
             if (data[0])
             {
                 ReadWriteFlags?.Invoke(Globals.REGISTER_WRITE, Globals.COUT_FLAG);
                 flags[Globals.COUT_FLAG] = true;
             }
 
-            //shift
+            ///shift
             for (int front = 1, back = 0; front < Globals.WORD_SIZE; front++, back++)
                 result[back] = data[front];
 
-            //result was 0
+            ///result was 0
             if (Globals.areBitsEqual(result, new BitArray(Globals.WORD_SIZE)))
             {
                 ReadWriteFlags?.Invoke(Globals.REGISTER_WRITE, Globals.ZERO_FLAG);
@@ -2602,18 +2421,18 @@ namespace CPU_Simulator
         {
             BitArray result = new BitArray(Globals.WORD_SIZE);
 
-            //MSB is 1, will be shifted out
+            ///MSB is 1, will be shifted out
             if (data[Globals.WORD_START])
             {
                 ReadWriteFlags?.Invoke(Globals.REGISTER_WRITE, Globals.COUT_FLAG);
                 flags[Globals.COUT_FLAG] = true;
             }
 
-            //shift
+            ///shift
             for (int front = 1, back = 0; front < Globals.WORD_SIZE; front++, back++)
                 result[front] = data[back];
 
-            //result was 0
+            ///result was 0
             if (Globals.areBitsEqual(result, new BitArray(Globals.WORD_SIZE)))
             {
                 ReadWriteFlags?.Invoke(Globals.REGISTER_WRITE, Globals.ZERO_FLAG);
@@ -2627,7 +2446,7 @@ namespace CPU_Simulator
         {
             BitArray result = data.Not();
 
-            //result was 0
+            ///result was 0
             if (Globals.areBitsEqual(result, new BitArray(Globals.WORD_SIZE)))
             {
                 ReadWriteFlags?.Invoke(Globals.REGISTER_WRITE, Globals.ZERO_FLAG);
@@ -2641,7 +2460,7 @@ namespace CPU_Simulator
         {
             BitArray result = firstNumber.And(TMP.readContents());
 
-            //result was 0
+            ///result was 0
             if (Globals.areBitsEqual(result, new BitArray(Globals.WORD_SIZE)))
             {
                 ReadWriteFlags?.Invoke(Globals.REGISTER_WRITE, Globals.ZERO_FLAG);
@@ -2655,7 +2474,7 @@ namespace CPU_Simulator
         {
             BitArray result = firstNumber.Or(TMP.readContents());
 
-            //result was 0
+            ///result was 0
             if (Globals.areBitsEqual(result, new BitArray(Globals.WORD_SIZE)))
             {
                 ReadWriteFlags?.Invoke(Globals.REGISTER_WRITE, Globals.ZERO_FLAG);
@@ -2669,7 +2488,7 @@ namespace CPU_Simulator
         {
             BitArray result = firstNumber.Xor(TMP.readContents());
 
-            //result was 0
+            ///result was 0
             if (Globals.areBitsEqual(result, new BitArray(Globals.WORD_SIZE)))
             {
                 ReadWriteFlags?.Invoke(Globals.REGISTER_WRITE, Globals.ZERO_FLAG);
@@ -2686,10 +2505,10 @@ namespace CPU_Simulator
 
             int count = Globals.WORD_START;
 
-            //examine MSB downward, first unequal bits breaks loop
+            ///examine MSB downward, first unequal bits breaks loop
             while (isequal && count >= 0)
             {
-                //first > second
+                ///first > second
                 if (firstNumber[count] && !secondNumber[count])
                 {
                     isequal = false;
@@ -2698,7 +2517,7 @@ namespace CPU_Simulator
                     flags[Globals.A_LARGER_FLAG] = true;
                 }
 
-                //first < second
+                ///first < second
                 else if (!firstNumber[count] && secondNumber[count])
                     isequal = false;
 
@@ -2715,23 +2534,23 @@ namespace CPU_Simulator
 
     public class ControlUnit
     {
-                                                        //GUI EVENTS
-        public event ReadWriteMemory ReadWriteGPR;      //update GPR with its new data (write), or indicate it is being accessed (read)
-        public event ReadWriteFlags ReadWriteFlags;     //same as above, but for flags
-        public event ALUOperation RunALUOperation;      //indicate type of operation being performed
-        public event RedrawGUI ResetControlBits;        //turn off all control bits (set, enable, opcodes) [invoke after each step of an instruction]
+        //GUI EVENTS
+        public event ReadWriteMemory ReadWriteGPR;      ///update GPR with its new data (write), or indicate it is being accessed (read)
+        public event ReadWriteFlags ReadWriteFlags;     ///same as above, but for flags
+        public event ALUOperation RunALUOperation;      ///indicate type of operation being performed
+        public event RedrawGUI ResetControlBits;        ///turn off all control bits (set, enable, opcodes) [invoke after each step of an instruction]
 
-        public event ReadWriteStack PushPopStack;       //shifts all stack elements up (pop), or down (push)
-        public event ReadOnlyRegister ReadTOS;          //reading TOS using readContents() feeds its output to the ALU, this event outputs to the bus instead
+        public event ReadWriteStack PushPopStack;       ///shifts all stack elements up (pop), or down (push)
+        public event ReadOnlyRegister ReadTOS;          ///reading TOS using readContents() feeds its output to the ALU, this event outputs to the bus instead
 
-        private bool registerMachine = false;   //CPU to simulate (toggles register and stack)
-        private bool programFinished = false;   //stop execution when true
+        private bool registerMachine = false;   ///CPU to simulate (toggles register and stack)
+        private bool programFinished = false;   ///stop execution when true
 
-        private BitArray opcode = new BitArray(Globals.OPCODE_SIZE);            //instruction to execute
-        private BitArray flagParameters = new BitArray(Globals.NO_OF_FLAGS);    //parameters for a jump if
-        private byte registerA, registerB;                                      //address of GPRs in use by current instruction (register machine only)
+        private BitArray opcode = new BitArray(Globals.OPCODE_SIZE);            ///instruction to execute
+        private BitArray flagParameters = new BitArray(Globals.NO_OF_FLAGS);    ///parameters for a jump if
+        private byte registerA, registerB;                                      ///address of GPRs in use by current instruction (register machine only)
         
-        //tracks the last executable instruction in memory
+        ///tracks the last executable instruction in memory
         public readonly BitArray lastInstruction = new BitArray(Globals.WORD_SIZE);
 
         private ALU ALU;
@@ -2744,7 +2563,7 @@ namespace CPU_Simulator
         private Register[] GPR = new Register[Globals.NO_OF_GPR];
         private Register[] stack = new Register[Globals.STACK_SIZE];
 
-        //initialise all CPU components for register machine
+        ///initialise all CPU components for register machine
         public ControlUnit                                                                                                  
             (BitArray[] instructions, ReadWriteMemory readWriteRAM, byte[] lastInstruction, ReadWriteMemory readWriteGPR,   
             ReadWriteRegister readWriteIAR, ReadWriteRegister readWriteIR, ReadWriteRegister readWriteMAR,                  
@@ -2773,7 +2592,7 @@ namespace CPU_Simulator
             ResetControlBits += resetControlBits;
         }
 
-        //initialise all CPU components for stack machine
+        ///initialise all CPU components for stack machine
         public ControlUnit
             (BitArray[] instructions, ReadWriteMemory readWriteRAM, byte[] lastInstruction, 
             ReadWriteStack pushPopStack, ReadWriteRegister readWriteStack, ReadOnlyRegister readTOS,
@@ -2810,7 +2629,7 @@ namespace CPU_Simulator
 
         public void start()
         {
-            //reset eveything to 0
+            ///reset eveything to 0
             if (programFinished)
             {
                 IR.setContents();
@@ -2837,7 +2656,7 @@ namespace CPU_Simulator
                 programFinished = false;
             }
 
-            //fetch execute loop
+            ///fetch execute loop
             while (!programFinished)
             {
                 fetchInstruction();
@@ -2857,35 +2676,35 @@ namespace CPU_Simulator
             setInstructionRegister();
         }
 
-        //point MAR to instruction to execute
+        ///point MAR to instruction to execute
         private void prepareInstruction()
         {
-            //copy next instruction address to MAR
+            ///copy next instruction address to MAR
             MAR.overwriteContents(IAR.readContents());          
             ResetControlBits?.Invoke();                         
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
 
-        //point IAR to next instruction
+        ///point IAR to next instruction
         private void incrementIAR()
         {
-            //IAR is at last instruction, program will finish after executing
+            ///IAR is at last instruction, program will finish after executing
             if (Globals.areBitsEqual(IAR.getContents(), lastInstruction)) programFinished = true;
 
-            ALU.toggleBUS1();                                   //enable BUS1 (ALU input B becomes 1)
-            ACC.overwriteContents(ALU.add(IAR.readContents())); //add IAR and B (increments value by 1)
-            ALU.toggleBUS1();                                   //disable BUS1
+            ALU.toggleBUS1();                                   ///enable BUS1 (ALU input B becomes 1)
+            ACC.overwriteContents(ALU.add(IAR.readContents())); ///add IAR and B (increments value by 1)
+            ALU.toggleBUS1();                                   ///disable BUS1
 
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
-            //update IAR with new value
+            ///update IAR with new value
             IAR.overwriteContents(ACC.readContents());          
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
 
-        //get instruction to execute
+        ///get instruction to execute
         private void setInstructionRegister()
         {
             //access next instruction in memory and copy to IR
@@ -2894,7 +2713,7 @@ namespace CPU_Simulator
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
         }
 
-        //divide instruction into opcode and addresses/parameters
+        ///divide instruction into opcode and addresses/parameters
         private void decodeInstruction()
         {
             BitArray IR = this.IR.readContents(),
@@ -2937,7 +2756,7 @@ namespace CPU_Simulator
             }
         }
         
-        //call method that matches the opcode
+        ///call method that matches the opcode
         private void executeInstruction()
         {
             string opcodeAsString = Globals.convertBitsToString(opcode);
@@ -3127,13 +2946,13 @@ namespace CPU_Simulator
         //REGISTER
         private void load()
         {
-            //prep MAR with address in register A
+            ///prep MAR with address in register A
             ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
             MAR.overwriteContents(GPR[registerA].readContents());
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
-            //copy data from memory address to register B
+            ///copy data from memory address to register B
             GPR[registerB].overwriteContents(MAR.readFromMemory());
             ReadWriteGPR?.Invoke(GPR[registerB].getContents(), registerB, Globals.REGISTER_WRITE);
             Thread.Sleep(Globals.CLOCK_SPEED);
@@ -3143,13 +2962,13 @@ namespace CPU_Simulator
         
         private void store()
         {
-            //prep MAR with address in register A
+            ///prep MAR with address in register A
             ReadWriteGPR?.Invoke(GPR[registerA].getContents(), registerA, Globals.REGISTER_READ);
             MAR.overwriteContents(GPR[registerA].readContents());
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
-            //copy data from register B to memory
+            ///copy data from register B to memory
             ReadWriteGPR?.Invoke(GPR[registerB].getContents(), registerB, Globals.REGISTER_READ);
             MAR.writeToMemory(GPR[registerB].readContents());
             ResetControlBits?.Invoke();
@@ -3158,15 +2977,15 @@ namespace CPU_Simulator
 
         private void data()
         {
-            //prep MAR with address in IAR
+            ///prep MAR with address in IAR
             MAR.overwriteContents(IAR.readContents());
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
-            //point IAR to next instruction after data
+            ///point IAR to next instruction after data
             incrementIAR();
 
-            //copy data from memory address to register B
+            ///copy data from memory address to register B
             GPR[registerB].overwriteContents(MAR.readFromMemory());
             ReadWriteGPR?.Invoke(GPR[registerB].getContents(), registerB, Globals.REGISTER_WRITE);
             Thread.Sleep(Globals.CLOCK_SPEED);
@@ -3176,7 +2995,7 @@ namespace CPU_Simulator
 
         private void jumpRegister()
         {
-            //copy register B to IAR
+            ///copy register B to IAR
             ReadWriteGPR?.Invoke(GPR[registerB].getContents(), registerB, Globals.REGISTER_READ);
             IAR.overwriteContents(GPR[registerB].readContents());
             ResetControlBits?.Invoke();
@@ -3186,22 +3005,22 @@ namespace CPU_Simulator
         //STACK
         private void pop()
         {
-            //prep MAR with address in IAR
+            ///prep MAR with address in IAR
             MAR.overwriteContents(IAR.readContents());
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
-            //point IAR to next instruction after data
+            ///point IAR to next instruction after data
             incrementIAR();
 
-            //get location to pop data into and prep into MAR
+            ///get location to pop data into and prep into MAR
             BitArray addressToPop = MAR.readFromMemory(false);
 
-            //check if address provided
+            ///check if address provided
             bool isBlank = true;
             for (int count = 0; count < Globals.WORD_SIZE; count++)     
             {
-                //break at first non zero bit
+                ///break at first non zero bit
                 if (addressToPop[count])                                
                 {
                     isBlank = false;
@@ -3211,22 +3030,22 @@ namespace CPU_Simulator
 
             if (!isBlank)
             {
-                //prep memory for write
+                ///prep memory for write
                 MAR.overwriteContents(addressToPop);
                 ResetControlBits?.Invoke();
                 if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
-                //write data in TOS to memory
+                ///write data in TOS to memory
                 ReadTOS?.Invoke();
                 MAR.writeToMemory(ALU.TMP.getContents());
                 ResetControlBits?.Invoke();
                 if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
             }
 
-            //shift stack upwards by 1
+            ///shift stack upwards by 1
             for (int lead = 0, trail = lead - 1; lead < Globals.STACK_SIZE; lead++, trail++)
             {
-                if (lead == 0) ALU.TMP.setContents(stack[lead].getContents());   //copy top of stack into TOS
+                if (lead == 0) ALU.TMP.setContents(stack[lead].getContents());   ///copy top of stack into TOS
                 else stack[trail].setContents(stack[lead].getContents());
 
                 PushPopStack?.Invoke(Globals.REGISTER_READ, lead);
@@ -3239,17 +3058,17 @@ namespace CPU_Simulator
 
         private void swap()
         {
-            //copy TOS to ACC
+            ///copy TOS to ACC
             ACC.overwriteContents(ALU.TMP.readContents());     
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
-            //copy top of stack into TOS
+            ///copy top of stack into TOS
             ALU.TMP.overwriteContents(stack[0].readContents()); 
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
-            //copy ACC to top of stack
+            ///copy ACC to top of stack
             stack[0].overwriteContents(ACC.readContents());      
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
@@ -3257,15 +3076,15 @@ namespace CPU_Simulator
 
         private void push()
         {
-            //prep MAR with address in IAR
+            ///prep MAR with address in IAR
             MAR.overwriteContents(IAR.readContents());
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
-            //point IAR to next instruction after data
+            ///point IAR to next instruction after data
             incrementIAR();
 
-            //start from the bottom and copy data from element above to current element
+            ///start from the bottom and copy data from element above to current element
             for (int lead = Globals.STACK_SIZE - 1, trail = lead - 1; trail >= 0; lead--, trail--)
             {
                 stack[lead].setContents(stack[trail].getContents());
@@ -3273,14 +3092,14 @@ namespace CPU_Simulator
                 Thread.Sleep(Globals.CLOCK_SPEED);
             }
 
-            //copy TOS into top of stack
+            ///copy TOS into top of stack
             stack[0].setContents(ALU.TMP.getContents());
             PushPopStack?.Invoke(Globals.REGISTER_WRITE, 0);
             Thread.Sleep(Globals.CLOCK_SPEED);
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
-            //push new data into TOS
+            ///push new data into TOS
             ALU.TMP.overwriteContents(MAR.readFromMemory());
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
@@ -3288,7 +3107,7 @@ namespace CPU_Simulator
 
         private void push(Register register)
         {
-            //start from the bottom and copy data from element above to current element
+            ///start from the bottom and copy data from element above to current element
             for (int lead = Globals.STACK_SIZE - 1, trail = lead - 1; trail >= 0; lead--, trail--)
             {
                 stack[lead].setContents(stack[trail].getContents());
@@ -3296,14 +3115,14 @@ namespace CPU_Simulator
                 Thread.Sleep(Globals.CLOCK_SPEED);
             }
 
-            //copy TOS into top of stack
+            ///copy TOS into top of stack
             stack[0].setContents(ALU.TMP.getContents());
             PushPopStack?.Invoke(Globals.REGISTER_WRITE, 0);
             Thread.Sleep(Globals.CLOCK_SPEED);
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
-            //push new data into TOS
+            ///push new data into TOS
             ALU.TMP.overwriteContents(register.readContents());
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
@@ -3311,7 +3130,7 @@ namespace CPU_Simulator
 
         private void jumpTOS()
         {
-            //copy TOS to IAR
+            ///copy TOS to IAR
             ReadTOS?.Invoke();
             IAR.overwriteContents(ALU.TMP.getContents());
             ResetControlBits?.Invoke();
@@ -3321,12 +3140,12 @@ namespace CPU_Simulator
         //ALL
         private void jump()
         {
-            //prep MAR with address in IAR
+            ///prep MAR with address in IAR
             MAR.overwriteContents(IAR.readContents());
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
-            //copy next address to IAR
+            ///copy next address to IAR
             IAR.overwriteContents(MAR.readFromMemory());
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
@@ -3338,21 +3157,21 @@ namespace CPU_Simulator
             {
                 bool conditionmet = true;
 
-                //invoke flag read event
+                ///invoke flag read event
                 ReadWriteFlags?.Invoke(Globals.REGISTER_READ);
                 Thread.Sleep(Globals.CLOCK_SPEED);
                 ResetControlBits?.Invoke();
                 if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
-                //compare state of flags with parameters
+                ///compare state of flags with parameters
                 for (int count = 0; count < Globals.NO_OF_FLAGS && conditionmet; count++)
                 {
                     if (flagParameters[count] != ALU.flags[count])
                         conditionmet = false;
                 }
 
-                if (conditionmet) jump();   //jump to specified instruction
-                else incrementIAR();        //step over to next instruction
+                if (conditionmet) jump();   ///jump to specified instruction
+                else incrementIAR();        ///step over to next instruction
             }
 
             else MessageBox.Show("Invalid condition");
@@ -3360,13 +3179,13 @@ namespace CPU_Simulator
 
         private void resetFlags()
         {
-            //flag reset event
+            ///flag reset event
             ReadWriteFlags?.Invoke(Globals.REGISTER_WRITE);
             Thread.Sleep(Globals.CLOCK_SPEED);
             ResetControlBits?.Invoke();
             if (Globals.CLOCK_SPEED != 0) Thread.Sleep(1000);
 
-            //set all flags to 0
+            ///set all flags to 0
             for (int count = 0; count < Globals.NO_OF_FLAGS; count++)
                 ALU.flags[count] = false;
         }
