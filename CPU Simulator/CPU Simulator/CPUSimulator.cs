@@ -1055,12 +1055,13 @@ namespace CPU_Simulator
                 {
                     CU.resetState();
                     resetComponents();
+
+                    if (CPU.ThreadState == ThreadState.Aborted)
+                        btnPauseStop.Text = "Pause";
+
                     Thread.Sleep(Globals.CLOCK_SPEED);
 
                     resetColours();
-
-                    if (CPU.ThreadState == ThreadState.Stopped)
-                        btnPauseStop.Text = "Pause";
                 }
 
                 if (compileAndRun())
@@ -1225,15 +1226,24 @@ namespace CPU_Simulator
 
                 //check if written as binary
                 bool isBinary = true;
+                string temp = "";
                 for (int currentBit = 0; currentBit < currentInstruction.Length; currentBit++)
                 {
-                    if (currentInstruction[currentBit] != '0' && currentInstruction[currentBit] != '1')
+                    if (currentInstruction[currentBit] != ' ' && currentInstruction[currentBit] != '0' && currentInstruction[currentBit] != '1')
                         isBinary = false;
+
+                    else if (currentInstruction[currentBit] == '1')
+                        temp += 1;
+
+                    else if (currentInstruction[currentBit] == '0')
+                        temp += 0;
                 }
 
                 //instruction is binary, convert to bitarray
                 if (isBinary)
                 {
+                    currentInstruction = temp;
+
                     //small enough to fit in memory
                     if (currentInstruction.Length <= Globals.WORD_SIZE)
                     {
@@ -1261,14 +1271,14 @@ namespace CPU_Simulator
                 else isBinary = false;
 
                 //convert assembly to binary
-                if (!isBinary) instruction = convertToBinary(currentInstruction, currentLine);     
+                if (!isBinary) instruction = convertToBinary(currentInstruction, currentLine);
 
                 //add instruction to program
-                if (instruction != null) instructions[currentLine] = instruction;   
+                if (instruction != null) instructions[currentLine] = instruction;
                 else compiled = false;
             }
 
-            if (!halt)
+            if (!halt && compiled)
             {
                 MessageBox.Show("No halt instruction used. Use 'HLT' after instruction you wish to stop at." );
                 compiled = false;
@@ -1308,18 +1318,52 @@ namespace CPU_Simulator
             //valid opcode
             if (parametersBinary && Globals.keywords.ContainsKey(opcode))
             {
-                //parameters for load, store and jump if require 4 bits
-                if (parameters.Length != Globals.GPR_ADDRESS_SIZE * 2 && (registerMachine && (Globals.keywords[opcode] == Globals.OP_LOAD_POP || Globals.keywords[opcode] == Globals.OP_STORE_SWAP)) || Globals.keywords[opcode] == Globals.OP_JUMP_IF)
-                    MessageBox.Show("Incorrect number of parameters provided at line: " + lineNo);
+                //following instructions require 4 bit parameters (register A and B or flags)
+                if (parameters.Length != Globals.GPR_ADDRESS_SIZE * 2 &&
 
-                //parameters for jump register and data only require register B (must fit within 2 bits)
-                else if (parameters.Length != Globals.GPR_ADDRESS_SIZE && (Globals.keywords[opcode] == Globals.OP_JUMP_RG_TOS || Globals.keywords[opcode] == Globals.OP_DATA_PUSH) && registerMachine)
-                    MessageBox.Show("Incorrect number of parameters provided at line: " + lineNo);
+                    //load, store and all ALU instructions (register model only)
+                    ((registerMachine && 
+                    (Globals.keywords[opcode] == Globals.OP_LOAD_POP || 
+                    Globals.keywords[opcode] == Globals.OP_STORE_SWAP ||
+                    Globals.keywords[opcode] == Globals.ALU_ADD ||
+                    Globals.keywords[opcode] == Globals.ALU_R_SHIFT || 
+                    Globals.keywords[opcode] == Globals.ALU_L_SHIFT ||
+                    Globals.keywords[opcode] == Globals.ALU_NOT ||
+                    Globals.keywords[opcode] == Globals.ALU_AND ||
+                    Globals.keywords[opcode] == Globals.ALU_OR ||
+                    Globals.keywords[opcode] == Globals.ALU_XOR ||
+                    Globals.keywords[opcode] == Globals.ALU_COMPARE)) ||
 
-                //no parameters required for stack CPU instructions (EXCEPT jump if)
-                //no parameters required for jump or reset on register CPU
-                else if (parameters.Length != 0 && (!registerMachine && Globals.keywords[opcode] != Globals.OP_JUMP_IF) || registerMachine && (Globals.keywords[opcode] == Globals.OP_JUMP || Globals.keywords[opcode] == Globals.OP_RESET_FLAGS))
+                    //jump if requires flag parameters (both CPU models)
+                    Globals.keywords[opcode] == Globals.OP_JUMP_IF))
+                {
                     MessageBox.Show("Incorrect number of parameters provided at line: " + lineNo);
+                }
+
+                //following instructions require 2 bit parameters (register B)
+                else if (parameters.Length != Globals.GPR_ADDRESS_SIZE &&
+
+                    //data and jump register (register model only)
+                    registerMachine && (Globals.keywords[opcode] == Globals.OP_JUMP_RG_TOS || 
+                    Globals.keywords[opcode] == Globals.OP_DATA_PUSH))
+                {
+                    MessageBox.Show("Incorrect number of parameters provided at line: " + lineNo);
+                }
+
+                //following instructions require no parameters
+                else if (parameters.Length != 0 &&
+
+                    //jump (in register model only) 
+                    (((registerMachine && (Globals.keywords[opcode] == Globals.OP_JUMP)) || 
+                    
+                    //reset (both CPU models)
+                    Globals.keywords[opcode] == Globals.OP_RESET_FLAGS) ||
+                    
+                    //all stack instructions except jump if
+                    (!registerMachine && Globals.keywords[opcode] != Globals.OP_JUMP_IF)))
+                {
+                    MessageBox.Show("Incorrect number of parameters provided at line: " + lineNo);
+                }
 
                 else
                 {
@@ -2166,50 +2210,27 @@ namespace CPU_Simulator
         
         public void resetComponents()
         {
-            lblIRContents.Text = "00000000";
-            lblIRContents.ForeColor = Color.Red;
-
-            lblIARContents.Text = "00000000";
-            lblIARContents.ForeColor = Color.Red;
-
-            lblMARContents.Text = "00000000";
-            lblMARContents.ForeColor = Color.Red;
-
-            lblRAMContents.Text = "00000000";
-            lblRAMContents.ForeColor = Color.Red;
-
-            lblRAMAddress.Text = "Addr 0";
-
-            lblTMPContents.Text = "00000000";
-            lblTMPContents.ForeColor = Color.Red;
-
-            lblAccContents.Text = "00000000";
-            lblAccContents.ForeColor = Color.Red;
-
-            lblCoutContents.ForeColor = Color.Red;
-            lblCoutContents.Text = "0";
-
-            lblALargerContents.ForeColor = Color.Red;
-            lblALargerContents.Text = "0";
-
-            lblEqualContents.ForeColor = Color.Red;
-            lblEqualContents.Text = "0";
-
-            lblZeroContents.ForeColor = Color.Red;
-            lblZeroContents.Text = "0";
+            updateIRContents(new BitArray(Globals.WORD_SIZE), Globals.REGISTER_WRITE);
+            updateIARContents(new BitArray(Globals.WORD_SIZE), Globals.REGISTER_WRITE);
+            updateMARContents(new BitArray(Globals.WORD_SIZE), Globals.REGISTER_WRITE);
+            accessRAMLocation(new BitArray(Globals.WORD_SIZE), 0, Globals.REGISTER_WRITE);
+            updateTMPContents(new BitArray(Globals.WORD_SIZE), Globals.REGISTER_WRITE);
+            updateAccumulatorContents(new BitArray(Globals.WORD_SIZE), Globals.REGISTER_WRITE);
+            updateFlagRegister(Globals.REGISTER_WRITE);
 
             if (registerMachine)
             {
                 for (int count = 0; count < Globals.NO_OF_GPR; count++)
                 {
-                    lblGPRContents[count].Text = "00000000";
-                    lblGPRContents[count].ForeColor = Color.Red;
+                    accessGPRContents(new BitArray(Globals.WORD_SIZE), count, Globals.REGISTER_WRITE);
                     pnlGPR[count].Refresh();
                 }
             }
 
             else
             {
+                accessStack(new BitArray(Globals.WORD_SIZE), Globals.REGISTER_WRITE);
+
                 for (int count = 0; count < Globals.STACK_SIZE; count++)
                 {
                     lblStackContents[count].Text = "00000000";
